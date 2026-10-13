@@ -21,7 +21,7 @@ export const JOURNAL_ENTRIES: JournalArticle[] = [
     date: "Stage 01",
     readTime: "Phase 1",
     category: "Telemetry Analysis",
-    thumbnail: "/src/assets/images/brand_identity_1791897232807.jpg",
+    thumbnail: "/src/assets/images/recovery_detect.jpg",
     excerpt:
       "Continuous onboard sensor diagnostics cross-evaluate attitude, power draw, and beacon heartbeats against dynamic orbital nominal thresholds.",
     content: [
@@ -36,7 +36,7 @@ export const JOURNAL_ENTRIES: JournalArticle[] = [
     date: "Stage 02",
     readTime: "Phase 2",
     category: "Consensus Quorum",
-    thumbnail: "/src/assets/images/urban_architecture_1791897231907.jpg",
+    thumbnail: "/src/assets/images/recovery_verify.jpg",
     excerpt:
       "Neighboring spacecraft poll anomalous nodes across inter-satellite cross-links to reach Byzantine consensus.",
     content: [
@@ -51,7 +51,7 @@ export const JOURNAL_ENTRIES: JournalArticle[] = [
     date: "Stage 03",
     readTime: "Phase 3",
     category: "Mesh Restructuring",
-    thumbnail: "/src/assets/images/automotive_motion_1791897232216.jpg",
+    thumbnail: "/src/assets/images/recovery_reconfigure.jpg",
     excerpt:
       "The surviving constellation members execute distributed election algorithms to reassign critical observation tasks and ground downlink relays.",
     content: [
@@ -66,7 +66,7 @@ export const JOURNAL_ENTRIES: JournalArticle[] = [
     date: "Stage 04",
     readTime: "Phase 4",
     category: "Kinematic Restoration",
-    thumbnail: "/src/assets/images/human_perspective_1791897232750.jpg",
+    thumbnail: "/src/assets/images/recovery_recover.jpg",
     excerpt:
       "Surviving nodes compute collision-free orbital maneuvers to close formation gaps and redistribute spatial coverage evenly.",
     content: [

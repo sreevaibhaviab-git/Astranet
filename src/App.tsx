@@ -6,6 +6,8 @@ import SelectedWorks, { Project } from "./components/SelectedWorks";
 import Journal, { JournalArticle } from "./components/Journal";
 import Explorations, { ExplorationItem } from "./components/Explorations";
 import Stats from "./components/Stats";
+import ArchitectureSection from "./components/ArchitectureSection";
+import MissionControlPreview from "./components/MissionControlPreview";
 import ContactFooter from "./components/ContactFooter";
 import ProjectModal from "./components/ProjectModal";
 import ExplorationModal from "./components/ExplorationModal";
@@ -29,7 +31,15 @@ export default function App() {
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
-      const sections = ["home", "work", "journal", "explorations", "contact"];
+      const sections = [
+        "home",
+        "work",
+        "journal",
+        "explorations",
+        "architecture",
+        "mission-control",
+        "contact",
+      ];
 
       for (const sectionId of sections) {
         const el = document.getElementById(sectionId);
@@ -106,7 +116,13 @@ export default function App() {
         {/* Section 6: Stats */}
         <Stats />
 
-        {/* Section 7: Contact / Footer */}
+        {/* Section 7: Live Swarm Architecture & Telemetry Monitor */}
+        <ArchitectureSection onOpenContact={() => scrollToSection("contact")} />
+
+        {/* Section 8: Live Digital Twin - Mission Control Preview */}
+        <MissionControlPreview onOpenContact={() => scrollToSection("contact")} />
+
+        {/* Section 9: Contact / Footer */}
         <ContactFooter onScrollToTop={handleScrollToTop} />
       </main>
 

@@ -25,7 +25,7 @@ export const PROJECTS: Project[] = [
     role: "Fault Detection Subsystem",
     description:
       "Real-time telemetry analysis and decentralized anomaly identification across the CubeSat swarm, enabling sub-second detection of sensor and thruster anomalies.",
-    image: "/src/assets/images/automotive_motion_1791897232216.jpg",
+    image: "/src/assets/images/distributed_fault_detection.jpg",
     colSpan: "md:col-span-7",
     aspectRatio: "aspect-[16/10] md:aspect-[16/9]",
     tags: ["Telemetry", "Anomaly Detection", "Consensus", "Fault Isolation"],
@@ -39,7 +39,7 @@ export const PROJECTS: Project[] = [
     role: "Quorum Verification Engine",
     description:
       "Multi-agent peer cross-verification protocol ensuring false alarms are filtered and hardware failures are validated by neighboring orbital nodes.",
-    image: "/src/assets/images/urban_architecture_1791897231907.jpg",
+    image: "/src/assets/images/peer_failure_verification.jpg",
     colSpan: "md:col-span-5",
     aspectRatio: "aspect-[4/3] md:aspect-[4/3]",
     tags: ["Byzantine Fault Tolerance", "Peer Validation", "Quorum", "Cross-Link"],
@@ -53,7 +53,7 @@ export const PROJECTS: Project[] = [
     role: "Autonomous Coordinator",
     description:
       "Automated topology restructuring and task reassignment protocols that dynamically restore swarm functionality following node dropouts.",
-    image: "/src/assets/images/human_perspective_1791897232750.jpg",
+    image: "/src/assets/images/self_healing_coordination.jpg",
     colSpan: "md:col-span-5",
     aspectRatio: "aspect-[4/3] md:aspect-[4/3]",
     tags: ["Dynamic Reconfiguration", "Mesh Network", "Autonomous Healing", "State Machine"],
@@ -67,7 +67,7 @@ export const PROJECTS: Project[] = [
     role: "Kinematic Guidance Engine",
     description:
       "Collision-free trajectory re-planning and station-keeping algorithms to maintain optimal swarm geometry and inter-satellite communication links.",
-    image: "/src/assets/images/brand_identity_1791897232807.jpg",
+    image: "/src/assets/images/adaptive_formation_control.jpg",
     colSpan: "md:col-span-7",
     aspectRatio: "aspect-[16/10] md:aspect-[16/9]",
     tags: ["Trajectory Optimization", "Collision Avoidance", "Station Keeping", "Relative Navigation"],
