@@ -13,6 +13,7 @@ import ProjectModal from "./components/ProjectModal";
 import ExplorationModal from "./components/ExplorationModal";
 import ArticleModal from "./components/ArticleModal";
 import ResumeModal from "./components/ResumeModal";
+import MissionControlDashboard from "./components/mission-control/MissionControlDashboard";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +27,34 @@ export default function App() {
     null
   );
   const [isResumeOpen, setIsResumeOpen] = useState(false);
+  const [isMissionControlOpen, setIsMissionControlOpen] = useState(false);
+
+  // Hash / URL detection for Mission Control
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (hash === "#mission-control" || search.includes("view=mission-control")) {
+        setIsMissionControlOpen(true);
+      }
+    };
+
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  const openMissionControl = () => {
+    setIsMissionControlOpen(true);
+    window.location.hash = "mission-control";
+  };
+
+  const closeMissionControl = () => {
+    setIsMissionControlOpen(false);
+    if (window.location.hash === "#mission-control") {
+      history.pushState(null, "", window.location.pathname);
+    }
+  };
 
   // Active section tracking on scroll
   useEffect(() => {
@@ -70,6 +99,10 @@ export default function App() {
     setActiveSection("home");
   };
 
+  if (isMissionControlOpen) {
+    return <MissionControlDashboard onExit={closeMissionControl} />;
+  }
+
   return (
     <div className="relative min-h-screen bg-bg text-text-primary selection:bg-[#4E85BF] selection:text-white">
       {/* Section 1: Loading Screen */}
@@ -80,14 +113,14 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={scrollToSection}
         onOpenResume={() => setIsResumeOpen(true)}
-        onOpenContact={() => scrollToSection("contact")}
+        onOpenContact={openMissionControl}
       />
 
       <main>
         {/* Section 2: Hero */}
         <Hero
           onSeeWorks={() => scrollToSection("work")}
-          onReachOut={() => scrollToSection("contact")}
+          onReachOut={openMissionControl}
         />
 
         {/* Section 3: Selected Works */}
@@ -117,10 +150,10 @@ export default function App() {
         <Stats />
 
         {/* Section 7: Live Swarm Architecture & Telemetry Monitor */}
-        <ArchitectureSection onOpenContact={() => scrollToSection("contact")} />
+        <ArchitectureSection onOpenContact={openMissionControl} />
 
         {/* Section 8: Live Digital Twin - Mission Control Preview */}
-        <MissionControlPreview onOpenContact={() => scrollToSection("contact")} />
+        <MissionControlPreview onOpenContact={openMissionControl} />
 
         {/* Section 9: Contact / Footer */}
         <ContactFooter onScrollToTop={handleScrollToTop} />
