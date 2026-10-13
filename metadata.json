@@ -1,0 +1,6 @@
+{
+  "name": "ASTRANET — Autonomous Space Systems",
+  "description": "Autonomous self-healing coordination for resilient CubeSat swarm operations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
