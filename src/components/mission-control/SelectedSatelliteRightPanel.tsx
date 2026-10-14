@@ -4,6 +4,7 @@ import {
   SubsystemStatus,
 } from "../../data/mockMissionControl";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import Satellite3DPreview from "./Satellite3DPreview";
 
 interface SelectedSatelliteRightPanelProps {
   satellite: SatelliteTelemetry;
@@ -35,7 +36,7 @@ export default function SelectedSatelliteRightPanel({
 
   return (
     <aside className="w-full lg:w-80 shrink-0 bg-[#080D15]/95 border-l border-white/6 flex flex-col justify-between p-6 select-none font-sans text-xs overflow-y-auto">
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Header: Satellite Name & Status */}
         <div className="pb-4 border-b border-white/6">
           <div className="flex items-baseline justify-between">
@@ -69,6 +70,14 @@ export default function SelectedSatelliteRightPanel({
             {satellite.plane} / {satellite.slot} · {satellite.role.charAt(0) + satellite.role.slice(1).toLowerCase()}
           </div>
         </div>
+
+        {/* Interactive 3D spacecraft inspector */}
+        <Satellite3DPreview
+          satelliteName={satellite.name}
+          role={satellite.role}
+          state={satellite.state}
+          subsystems={satellite.subsystems}
+        />
 
         {/* SECTION 1: Resources & Trust */}
         <div className="space-y-3">
@@ -159,6 +168,109 @@ export default function SelectedSatelliteRightPanel({
             {satellite.autonomyStatus}
           </p>
         </div>
+        {/* SECTION 5: Satellite Profile */}
+        <div className="space-y-3 pt-2">
+          <div className="text-[11px] font-medium text-[#7F8C9A] uppercase tracking-wider">
+            Satellite Profile
+          </div>
+
+          <div className="rounded-lg border border-white/[0.05] bg-white/[0.02] divide-y divide-white/[0.05]">
+            <div className="px-3 py-2.5">
+              <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                Mission Use
+              </div>
+              <div className="mt-1 text-[10px] leading-relaxed text-[#D7DEE7]">
+                {satellite.role === "COORDINATOR"
+                  ? "Swarm coordination, peer-consensus support, Earth observation and relay assistance."
+                  : satellite.role === "RELAY"
+                  ? "Inter-satellite communications relay, network continuity and distributed data forwarding."
+                  : satellite.role === "ISOLATED"
+                  ? "Temporarily isolated spacecraft undergoing fault containment or autonomous recovery."
+                  : "Earth observation, distributed sensing and cooperative swarm mission support."}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3">
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Platform
+                </div>
+                <div className="mt-1 text-[10px] text-white">
+                  CubeSat
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Launch / Deployment
+                </div>
+                <div className="mt-1 text-[10px] text-[#AAB5C2]">
+                  Simulation asset
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Orbit
+                </div>
+                <div className="mt-1 text-[10px] text-white tabular-nums">
+                  {satellite.altitudeKm} km LEO
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Inclination
+                </div>
+                <div className="mt-1 text-[10px] text-white tabular-nums">
+                  {satellite.inclinationDeg}°
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Orbital Period
+                </div>
+                <div className="mt-1 text-[10px] text-white tabular-nums">
+                  {satellite.orbitPeriodSec} min
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Assignment
+                </div>
+                <div className="mt-1 text-[10px] text-white">
+                  {satellite.plane} · {satellite.slot}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Mission State
+                </div>
+                <div className="mt-1 text-[10px] text-[#10B981]">
+                  {satellite.missionState}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-[#536170]">
+                  Swarm ID
+                </div>
+                <div className="mt-1 text-[10px] text-white">
+                  {satellite.id}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-3 py-2.5 text-[9px] leading-relaxed text-[#536170]">
+              ASTRANET currently models this spacecraft as a simulated swarm asset.
+              No real-world launch date is claimed.
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Action Footer: Inject Fault & Reset buttons */}
