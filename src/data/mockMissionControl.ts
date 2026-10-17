@@ -41,6 +41,59 @@ export interface SatelliteNetwork {
   localEpoch: number;
 }
 
+export interface PositionVector {
+  x: number; // km (ECI)
+  y: number; // km (ECI)
+  z: number; // km (ECI)
+  lat: number; // Geodetic Latitude in degrees (-90 to +90)
+  lon: number; // Geographic Longitude in degrees (-180 to +180)
+  altKm: number; // Altitude in kilometers above mean Earth (550 km)
+}
+
+export interface VelocityVector {
+  vx: number; // km/s (ECI)
+  vy: number; // km/s (ECI)
+  vz: number; // km/s (ECI)
+  speedKmS: number; // Orbital speed in km/s (~7.59 km/s)
+}
+
+export interface NetworkSummary {
+  activeLinks: number;
+  connected: boolean;
+  partitionCount: number;
+  averageLatencyMs: number;
+  maxRangeKm: number;
+}
+
+export interface SwarmClock {
+  epochSec: number;
+  elapsedSec: number;
+  timeString: string;
+  utcString: string;
+  warpFactor: number;
+  isPaused: boolean;
+  ticks: number;
+}
+
+export interface SwarmSummary {
+  total: number;
+  nominal: number;
+  degraded: number;
+  failed: number;
+  coordinatorId: string;
+  missionCode: string;
+  missionState: string;
+}
+
+export interface TelemetryFrame {
+  clock: SwarmClock;
+  satellites: SatelliteTelemetry[];
+  links: Array<[string, string]>;
+  network: NetworkSummary;
+  events: MissionEvent[];
+  swarmSummary: SwarmSummary;
+}
+
 export interface SatelliteTelemetry {
   id: string; // e.g. "SAT-07"
   name: string;
@@ -55,6 +108,9 @@ export interface SatelliteTelemetry {
   inclinationDeg: number;
   phaseDeg: number; // initial orbital phase angle (0-360)
   orbitPeriodSec: number;
+  // Live digital twin kinematics from simulation backend
+  position?: PositionVector;
+  velocity?: VelocityVector;
   // Resource metrics
   battery: number; // percentage (0-100)
   propellant: number; // percentage (0-100)
