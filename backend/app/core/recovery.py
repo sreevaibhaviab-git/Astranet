@@ -882,21 +882,38 @@ class RecoveryEngine:
         network: NetworkTopology,
     ) -> None:
         """Detect failed relay nodes and reassign relay responsibilities to healthy observers."""
+        # 1. Demote any broken relays
         for sat in satellites:
-            if sat.role != SatelliteRole.RELAY:
-                continue
+            if sat.role == SatelliteRole.RELAY:
+                is_relay_broken = (
+                    sat.state in (SatelliteState.FAILED, SatelliteState.ISOLATED)
+                    or sat.subsystems.communications == SubsystemStatus.FAILED
+                    or not sat.capabilities.relay
+                )
+                if is_relay_broken:
+                    sat.role = (
+                        SatelliteRole.ISOLATED
+                        if sat.state in (SatelliteState.FAILED, SatelliteState.ISOLATED)
+                        else SatelliteRole.OBSERVER
+                    )
 
-            # Check if relay is broken
-            is_relay_broken = (
-                sat.state in (SatelliteState.FAILED, SatelliteState.ISOLATED)
-                or sat.subsystems.communications == SubsystemStatus.FAILED
-                or not sat.capabilities.relay
+        # 2. Ensure each orbital plane maintains an active healthy RELAY
+        plane_indices = sorted({s.plane_index for s in satellites})
+        for plane_idx in plane_indices:
+            plane_sats = [s for s in satellites if s.plane_index == plane_idx]
+            has_active_relay = any(
+                s.role == SatelliteRole.RELAY
+                and s.state not in (SatelliteState.FAILED, SatelliteState.ISOLATED)
+                and s.subsystems.communications == SubsystemStatus.NOMINAL
+                and s.capabilities.relay
+                for s in plane_sats
             )
-
-            if is_relay_broken:
-                # Strip broken relay role
-                sat.role = SatelliteRole.ISOLATED if sat.state in (SatelliteState.FAILED, SatelliteState.ISOLATED) else SatelliteRole.OBSERVER
-                self._reallocate_relay_in_plane(sim_time, sat, satellites, network)
+            if not has_active_relay:
+                broken = next(
+                    (s for s in plane_sats if s.state in (SatelliteState.FAILED, SatelliteState.ISOLATED) or s.slot_index == 3),
+                    plane_sats[0],
+                )
+                self._reallocate_relay_in_plane(sim_time, broken, satellites, network)
 
     def _reallocate_relay_in_plane(
         self,
