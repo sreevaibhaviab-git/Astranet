@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "id": "nominal_flight",
+  "name": "Nominal Swarm Flight (Baseline)",
+  "description": "Validates continuous nominal constellation flight across multiple orbital step cycles without anomalies. Confirms that all 12 CubeSats remain NOMINAL, active ISLs are preserved, and leadership remains stable.",
+  "configuration": {
+    "duration_sec": 10.0,
+    "time_step_sec": 0.5,
+    "time_warp": 1.0,
+    "max_isl_range_m": 5000000.0,
+    "random_seed": null
+  },
+  "initial_invariants": {
+    "min_nominal_satellites": 12,
+    "expected_coordinator": "SAT-07",
+    "expected_relays": ["SAT-04", "SAT-08", "SAT-12"]
+  },
+  "scheduled_faults": [],
+  "expected_outcomes": {
+    "max_detection_delay_sec": 0.0,
+    "expected_role_reassignments": [],
+    "expected_completed_recoveries": [],
+    "unrecoverable_satellites": [],
+    "allowed_unresolved_conditions": [],
+    "require_no_manual_intervention": true
+  },
+  "acceptance_thresholds": {
+    "min_nominal_at_end": 12,
+    "max_failed_at_end": 0,
+    "max_degraded_at_end": 0,
+    "min_active_links_at_end": 4,
+    "expected_coordinator_at_end": "SAT-07"
+  }
+}
