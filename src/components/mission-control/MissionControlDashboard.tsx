@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import {
-  SatelliteTelemetry,
   MissionEvent,
   INITIAL_SATELLITES,
-  INITIAL_EVENTS,
   applyFailureToSwarm,
   FailureType,
   FailureSeverity,
 } from "../../data/mockMissionControl";
+import { useSwarmTelemetry } from "../../hooks/useSwarmTelemetry";
 import CesiumGlobe from "./CesiumGlobe";
 import OperationsLeftPanel from "./OperationsLeftPanel";
 import SelectedSatelliteRightPanel from "./SelectedSatelliteRightPanel";
@@ -22,18 +21,32 @@ interface MissionControlDashboardProps {
 export default function MissionControlDashboard({
   onExit,
 }: MissionControlDashboardProps) {
-  // Swarm State
-  const [satellites, setSatellites] =
-    useState<SatelliteTelemetry[]>(INITIAL_SATELLITES);
-  const [selectedSatelliteId, setSelectedSatelliteId] =
-    useState<string>("SAT-07"); // Default selected: SAT-07
-  const [events, setEvents] = useState<MissionEvent[]>(INITIAL_EVENTS);
+  // Live Backend Telemetry Hook
+  const {
+    satellites,
+    events,
+    networkMetrics,
+    clock,
+    swarmSummary,
+    links,
+    connectionStatus,
+    isConnected,
+    isPaused,
+    error: telemetryError,
+    injectFault: backendInjectFault,
+    resetSimulation: backendResetSimulation,
+    pauseSimulation,
+    resumeSimulation,
+  } = useSwarmTelemetry();
+
+  // Selection & Navigation State
+  const [selectedSatelliteId, setSelectedSatelliteId] = useState<string>("SAT-07");
   const [activeNavTab, setActiveNavTab] = useState<string>("Live Globe");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isFaultModalOpen, setIsFaultModalOpen] = useState<boolean>(false);
 
-  // Simulation Clock (T+ 00:14:32 counter)
-  const [simSeconds, setSimSeconds] = useState<number>(872); // 14m 32s
+  // Fallback Simulation Clock (T+ 00:14:32 counter) for standalone mode
+  const [simSeconds, setSimSeconds] = useState<number>(872);
   const [utcTime, setUtcTime] = useState<string>("");
 
   useEffect(() => {
@@ -53,7 +66,7 @@ export default function MissionControlDashboard({
   const formatMissionTime = (totalSec: number) => {
     const hours = Math.floor(totalSec / 3600);
     const mins = Math.floor((totalSec % 3600) / 60);
-    const secs = totalSec % 60;
+    const secs = Math.floor(totalSec % 60);
     return `${String(hours).padStart(2, "0")}:${String(mins).padStart(
       2,
       "0"
@@ -61,43 +74,47 @@ export default function MissionControlDashboard({
   };
 
   const selectedSatellite =
-    satellites.find((s) => s.id === selectedSatelliteId) || satellites[6];
+    satellites.find((s) => s.id === selectedSatelliteId) ||
+    satellites[0] ||
+    INITIAL_SATELLITES[0];
 
-  const isAnyFaultActive = satellites.some((s) => s.state !== "NOMINAL");
+  const coordinatorId = swarmSummary?.coordinatorId || "SAT-07";
 
-  const handleInjectFault = (
+  const isAnyFaultActive =
+    satellites.some((s) => s.state !== "NOMINAL") ||
+    (swarmSummary ? swarmSummary.failed > 0 || swarmSummary.degraded > 0 : false);
+
+  const handleInjectFault = async (
     targetId: string,
     failureType: FailureType,
     severity: FailureSeverity
   ) => {
-    const { updatedSatellites, newEvent } = applyFailureToSwarm(
+    if (isConnected) {
+      const res = await backendInjectFault(targetId, failureType, severity);
+      if (!res.ok) {
+        throw new Error(res.error || "Fault injection rejected by simulation engine.");
+      }
+      setSelectedSatelliteId(targetId);
+      return;
+    }
+
+    // Fallback standalone local mock mode
+    const { updatedSatellites } = applyFailureToSwarm(
       satellites,
       targetId,
       failureType,
       severity
     );
-
-    setSatellites(updatedSatellites);
-    setEvents((prev) => [newEvent, ...prev]);
     setSelectedSatelliteId(targetId);
   };
 
-  const handleResetSwarm = () => {
-    setSatellites(INITIAL_SATELLITES);
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+  const handleResetSwarm = async () => {
+    if (isConnected) {
+      await backendResetSimulation();
+      setSelectedSatelliteId("SAT-07");
+      return;
+    }
 
-    const resetEvent: MissionEvent = {
-      id: `ev-reset-${Date.now()}`,
-      timestamp: timeStr,
-      type: "RECOVERY",
-      category: "RECOVERY",
-      severity: "nominal",
-      message: "All 12 CubeSat nodes reset to nominal state",
-    };
-    setEvents((prev) => [resetEvent, ...prev]);
     setSelectedSatelliteId("SAT-07");
   };
 
@@ -112,6 +129,8 @@ export default function MissionControlDashboard({
       }
     }
   };
+
+  const currentMissionElapsedSec = clock ? clock.elapsedSec : simSeconds;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#05080D] text-[#F3F6F8] font-sans select-none overflow-hidden antialiased">
@@ -180,11 +199,48 @@ export default function MissionControlDashboard({
             />
           </div>
 
-          {/* LIVE SIM badge */}
-          <div className="flex items-center gap-1.5 text-xs text-[#10B981] font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-            <span>LIVE SIM</span>
-          </div>
+          {/* Pause / Resume simulation control */}
+          {isConnected && (
+            <button
+              onClick={() => (isPaused ? resumeSimulation() : pauseSimulation())}
+              title={isPaused ? "Resume simulation execution" : "Pause simulation execution"}
+              className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs text-[#AAB7C4] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+            >
+              {isPaused ? "▶ Resume" : "⏸ Pause"}
+            </button>
+          )}
+
+          {/* LIVE SIM / RECONNECTING / STANDALONE MOCK badge */}
+          {connectionStatus === "connected" ? (
+            <div
+              className="flex items-center gap-1.5 text-xs text-[#10B981] font-medium"
+              title="Connected to FastAPI WebSocket /ws/telemetry"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+              <span>LIVE SIM</span>
+              {isPaused && (
+                <span className="text-[10px] text-[#F59E0B] font-mono px-1 py-0.2 rounded bg-[#F59E0B]/10 border border-[#F59E0B]/20">
+                  PAUSED
+                </span>
+              )}
+            </div>
+          ) : connectionStatus === "reconnecting" ? (
+            <div
+              className="flex items-center gap-1.5 text-xs text-[#F59E0B] font-medium"
+              title="Reconnecting to backend with exponential backoff..."
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] animate-ping" />
+              <span>RECONNECTING</span>
+            </div>
+          ) : (
+            <div
+              className="flex items-center gap-1.5 text-xs text-[#EF4444] font-medium"
+              title={telemetryError || "Backend disconnected; running with standalone fallback fixtures"}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#EF4444]" />
+              <span>STANDALONE MOCK</span>
+            </div>
+          )}
 
           {/* UTC Clock */}
           <div className="text-xs text-[#7F8C9A] tabular-nums font-normal">
@@ -207,15 +263,16 @@ export default function MissionControlDashboard({
             satellites={satellites}
             selectedSatelliteId={selectedSatelliteId}
             onSelectSatellite={setSelectedSatelliteId}
-            missionTime={formatMissionTime(simSeconds)}
-            coordinatorId="SAT-07"
+            missionTime={formatMissionTime(currentMissionElapsedSec)}
+            coordinatorId={coordinatorId}
+            activeLinks={links}
           />
         </main>
 
         {/* CLEAN RIGHT SELECTED SATELLITE PANEL (320px) */}
         <SelectedSatelliteRightPanel
           satellite={selectedSatellite}
-          onOpenFaultModal={() => setIsFaultModalOpen(true)}
+          onOpenFaultModal={() => setIsFaultModalOpen(false || true)}
           onResetSwarm={handleResetSwarm}
           isAnyFaultActive={isAnyFaultActive}
         />
@@ -225,7 +282,11 @@ export default function MissionControlDashboard({
           RESTRAINED BOTTOM SUMMARY STRIP
           ========================================================================= */}
       <footer className="shrink-0 z-20">
-        <MetricsBottomBar satellites={satellites} />
+        <MetricsBottomBar
+          satellites={satellites}
+          networkSummary={networkMetrics}
+          swarmSummary={swarmSummary}
+        />
       </footer>
 
       {/* =========================================================================
