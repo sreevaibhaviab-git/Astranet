@@ -91,10 +91,11 @@ class SwarmOrchestrator:
 
     @property
     def coordinator(self) -> Optional[CubeSat]:
-        """Return the current swarm coordinator satellite if one is designated."""
+        """Return the current swarm coordinator satellite if one is designated and operational."""
         for sat in self._satellites_list:
             if sat.role == SatelliteRole.COORDINATOR:
-                return sat
+                if sat.state not in (SatelliteState.FAILED, SatelliteState.ISOLATED):
+                    return sat
         return None
 
     @property
