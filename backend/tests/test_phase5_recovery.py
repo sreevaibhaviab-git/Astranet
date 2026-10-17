@@ -420,3 +420,221 @@ class TestPhase5RegressionAndIntegrity(unittest.TestCase):
         self.assertEqual(len(self.swarm.recovery_engine.active_tasks), 0)
         self.assertEqual(self.swarm.coordinator.id, "SAT-07")
         self.assertEqual(self.swarm.get_satellite("SAT-07").state, SatelliteState.NOMINAL)
+
+
+class TestPhase51TargetedDefectCorrections(unittest.TestCase):
+    """Phase 5.1: Targeted regression tests for adversarial review defect corrections."""
+
+    def setUp(self) -> None:
+        self.swarm = SwarmOrchestrator()
+
+    def test_defect1_preserve_unrecoverable_propulsion_fault_after_compute_recovery(self) -> None:
+        """Fix 1: Never unconditionally set NOMINAL after a task completes.
+        Preserve concurrent and unrecoverable failures (e.g. propulsion hardware failure).
+        """
+        sat = self.swarm.get_satellite("SAT-01")
+
+        # 1. Inject critical propulsion failure (permanent hardware fault)
+        self.swarm.inject_fault(
+            target_satellite_id="SAT-01",
+            failure_type=FailureType.PROPULSION_FAILURE,
+            severity=FailureSeverity.CRITICAL,
+        )
+        self.assertEqual(sat.subsystems.propulsion, SubsystemStatus.FAILED)
+        self.assertFalse(sat.capabilities.maneuvering)
+        self.assertEqual(sat.state, SatelliteState.FAILED)
+        self.assertEqual(sat.last_anomaly, "Propulsion Failure (CRITICAL)")
+
+        # Step 0.5s: Propulsion is contained as unrecoverable
+        self.swarm.step(0.5)
+
+        # 2. Inject recoverable moderate compute fault
+        self.swarm.inject_fault(
+            target_satellite_id="SAT-01",
+            failure_type=FailureType.COMPUTE_FAILURE,
+            severity=FailureSeverity.MODERATE,
+        )
+        self.swarm.step(0.5)
+        # Node enters RECOVERING for compute watchdog reset
+        self.assertEqual(sat.state, SatelliteState.RECOVERING)
+
+        # Step 3.5s more (cumulative 4.0s >= 3.0s duration): Compute recovery finishes
+        self.swarm.step(3.5)
+
+        # 3. Assert compute is restored, but propulsion remains FAILED and state is NOT NOMINAL
+        self.assertEqual(sat.subsystems.compute, SubsystemStatus.NOMINAL)
+        self.assertTrue(sat.capabilities.compute)
+        self.assertEqual(sat.subsystems.propulsion, SubsystemStatus.FAILED)
+        self.assertFalse(sat.capabilities.maneuvering)
+        self.assertNotEqual(sat.state, SatelliteState.NOMINAL)
+        self.assertEqual(sat.state, SatelliteState.FAILED)
+        self.assertIsNotNone(sat.last_anomaly)
+        self.assertIn("Propulsion", sat.last_anomaly)
+
+    def test_defect2_allow_subsequent_occurrences_of_same_recoverable_fault(self) -> None:
+        """Fix 2: Release processed anomaly tracking when recovery task finishes,
+        allowing later occurrences of the same fault to be detected and recovered.
+        """
+        sat = self.swarm.get_satellite("SAT-02")
+
+        # 1. First injection
+        self.swarm.inject_fault("SAT-02", FailureType.COMPUTE_FAILURE, FailureSeverity.MODERATE)
+        self.swarm.step(0.5)
+        self.assertEqual(sat.state, SatelliteState.RECOVERING)
+
+        # Step until first recovery finishes
+        self.swarm.step(3.5)
+        self.assertEqual(sat.state, SatelliteState.NOMINAL)
+        self.assertEqual(sat.subsystems.compute, SubsystemStatus.NOMINAL)
+
+        # 2. Second injection of same recoverable fault
+        self.swarm.inject_fault("SAT-02", FailureType.COMPUTE_FAILURE, FailureSeverity.MODERATE)
+        self.swarm.step(0.5)
+        self.assertEqual(sat.state, SatelliteState.RECOVERING)
+
+        # Step until second recovery finishes
+        self.swarm.step(3.5)
+        self.assertEqual(sat.state, SatelliteState.NOMINAL)
+        self.assertEqual(sat.subsystems.compute, SubsystemStatus.NOMINAL)
+
+        # Confirm two distinct completion events exist
+        completion_events = [
+            ev for ev in self.swarm.events
+            if ev.satellite_id == "SAT-02" and "compute watchdog reset successful" in ev.message
+        ]
+        self.assertEqual(len(completion_events), 2)
+
+    def test_defect3_coordinator_telemetry_unresolved_after_failed_election(self) -> None:
+        """Fix 3: When no valid coordinator exists, telemetry frame publishes 'UNRESOLVED',
+        never publishing a failed or isolated node as active coordinator.
+        """
+        # Inject catastrophic node loss on coordinator SAT-07
+        self.swarm.inject_fault("SAT-07", FailureType.NODE_LOSS, FailureSeverity.CRITICAL)
+        self.swarm.step(1.0)
+
+        # Both swarm.coordinator and frame coordinatorId must reflect unresolved leadership
+        self.assertIsNone(self.swarm.coordinator)
+        frame = self.swarm.get_telemetry_frame()
+        self.assertEqual(frame["swarmSummary"]["coordinatorId"], "UNRESOLVED")
+        self.assertNotEqual(frame["swarmSummary"]["coordinatorId"], "SAT-07")
+        self.assertEqual(self.swarm.recovery_engine.last_known_coordinator_id, "SAT-07")
+
+    def test_defect4_partition_aware_election_disconnected_and_reachable_quorum(self) -> None:
+        """Fix 4: Election must not elect a global leader across disconnected components.
+        Reachable quorum within candidate's connected component is required.
+        """
+        # Scenario A: Disconnected components (baseline at t=0 has 6 partitions of size 2)
+        self.swarm.inject_fault("SAT-07", FailureType.NODE_LOSS, FailureSeverity.CRITICAL)
+        self.swarm.step(1.0)
+        self.assertTrue(self.swarm.recovery_engine.is_leadership_unresolved)
+        self.assertIsNone(self.swarm.coordinator)
+
+        # Scenario B: Connected component with insufficient reachable quorum (< 7)
+        small_net = NetworkTopology()
+        # Connect only 4 nodes: SAT-01, SAT-02, SAT-03, SAT-04
+        small_net._graph.add_edge("SAT-01", "SAT-02")
+        small_net._graph.add_edge("SAT-02", "SAT-03")
+        small_net._graph.add_edge("SAT-03", "SAT-04")
+
+        self.swarm.recovery_engine._execute_coordinator_election(
+            sim_time=2.0,
+            satellites=self.swarm.satellites,
+            network=small_net,
+            old_coordinator_id="SAT-07",
+        )
+        self.assertTrue(self.swarm.recovery_engine.is_leadership_unresolved)
+        self.assertIsNone(self.swarm.coordinator)
+
+        # Scenario C: Connected component with sufficient reachable quorum (>= 7) and strict majority
+        connected_net = NetworkTopology()
+        connected_nodes = ["SAT-01", "SAT-02", "SAT-03", "SAT-04", "SAT-05", "SAT-06", "SAT-08"]
+        for i in range(len(connected_nodes) - 1):
+            connected_net._graph.add_edge(connected_nodes[i], connected_nodes[i + 1])
+
+        self.swarm.recovery_engine._execute_coordinator_election(
+            sim_time=3.0,
+            satellites=self.swarm.satellites,
+            network=connected_net,
+            old_coordinator_id="SAT-07",
+        )
+        self.assertFalse(self.swarm.recovery_engine.is_leadership_unresolved)
+        self.assertIsNotNone(self.swarm.coordinator)
+        self.assertIn(self.swarm.coordinator.id, connected_nodes)
+        frame = self.swarm.get_telemetry_frame()
+        self.assertEqual(frame["swarmSummary"]["coordinatorId"], self.swarm.coordinator.id)
+
+    def test_defect5_peer_verification_zero_one_and_sufficient_peers(self) -> None:
+        """Fix 5: Differentiate 0 peers (unresolved), 1 peer (local observation),
+        and >=2 peers (multi-peer observation) without claiming Byzantine consensus.
+        """
+        engine = RecoveryEngine()
+        net = NetworkTopology()
+        orbit = KeplerianOrbit(semi_major_axis_m=6921000.0, eccentricity=0.0, inclination_deg=53.0, raan_deg=0.0, arg_perigee_deg=0.0, initial_phase_deg=0.0)
+
+        target = CubeSat("SAT-01", "Sat1", "PLANE A", 0, "SLOT 01", 0, orbit)
+        target.subsystems.compute = SubsystemStatus.FAILED
+
+        # 1. Zero peers: isolated node fails verification honestly
+        verified, votes, total, reason = engine._verify_peer_consensus(target, [target], net)
+        self.assertFalse(verified)
+        self.assertEqual(total, 0)
+        self.assertIn("0 reachable peers", reason)
+
+        # 2. One peer: local observation confirmed with explicit limited-confidence disclaimer
+        peer1 = CubeSat("SAT-02", "Sat2", "PLANE A", 0, "SLOT 02", 1, orbit)
+        peer1.current_state = target.current_state
+        verified, votes, total, reason = engine._verify_peer_consensus(target, [target, peer1], net)
+        self.assertTrue(verified)
+        self.assertEqual(total, 1)
+        self.assertIn("Single-peer local observation", reason)
+
+        # 3. Sufficient peers (>=2): multi-peer observation confirms with vote ratio
+        peer2 = CubeSat("SAT-03", "Sat3", "PLANE A", 0, "SLOT 03", 2, orbit)
+        peer2.current_state = target.current_state
+        verified, votes, total, reason = engine._verify_peer_consensus(target, [target, peer1, peer2], net)
+        self.assertTrue(verified)
+        self.assertEqual(total, 2)
+        self.assertIn("Multi-peer observation", reason)
+
+    def test_defect6_power_recovery_bounded_rate_recharge(self) -> None:
+        """Fix 6: Power recovery uses a rate-limited, bounded recharge model."""
+        sat = self.swarm.get_satellite("SAT-01")
+        self.swarm.inject_fault("SAT-01", FailureType.POWER_DEGRADATION, FailureSeverity.MODERATE)
+        initial_bat = sat.battery
+
+        self.swarm.step(0.5)
+        self.assertEqual(sat.state, SatelliteState.RECOVERING)
+
+        # Step through 5.0s recharge duration
+        self.swarm.step(5.5)
+        self.assertEqual(sat.state, SatelliteState.NOMINAL)
+        self.assertEqual(sat.subsystems.power, SubsystemStatus.NOMINAL)
+
+        # Recharge rate is 5.0%/s * 5.0s = 25.0%
+        expected_recharge = min(25.0, 5.0 * RecoveryEngine.SOLAR_RECHARGE_RATE_PCT_PER_SEC)
+        self.assertAlmostEqual(sat.battery, min(RecoveryEngine.MAX_RECOVERED_BATTERY_PCT, initial_bat + expected_recharge), delta=0.5)
+
+        power_events = [
+            ev for ev in self.swarm.events
+            if ev.satellite_id == "SAT-01" and "power recovery complete" in ev.message
+        ]
+        self.assertEqual(len(power_events), 1)
+        self.assertIn("bounded model", power_events[0].message)
+
+    def test_defect7_relay_handover_connectivity_evaluation(self) -> None:
+        """Fix 7: Relay handover evaluates the actual recomputed network graph and reports
+        whether active links were restored or handover is partial.
+        """
+        # Break SAT-04 relay in Plane A
+        self.swarm.inject_fault("SAT-04", FailureType.COMMUNICATION_FAILURE, FailureSeverity.CRITICAL)
+        self.swarm.step(1.0)
+
+        # Handover event must report active links restored or partial handover based on graph degrees
+        reassignment_events = [
+            ev for ev in self.swarm.events
+            if ev.type == "RECOVERY" and ("Relay reassignment" in ev.message or "Relay handover partial" in ev.message)
+        ]
+        self.assertTrue(len(reassignment_events) >= 1)
+        event_msg = reassignment_events[0].message
+        self.assertTrue("restored" in event_msg or "partial" in event_msg)
+
