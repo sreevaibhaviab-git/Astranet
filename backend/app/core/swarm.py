@@ -260,8 +260,8 @@ class SwarmOrchestrator:
         coord = self.coordinator
         if coord:
             coordinator_id = coord.id
-        elif self.recovery_engine.is_leadership_unresolved and self.recovery_engine._last_known_coordinator_id:
-            coordinator_id = self.recovery_engine._last_known_coordinator_id
+        elif self.recovery_engine.is_leadership_unresolved:
+            coordinator_id = "UNRESOLVED"
         else:
             coordinator_id = "NONE"
 
