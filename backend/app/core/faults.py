@@ -47,14 +47,24 @@ class FaultEvent:
     failure_type: FailureType
     severity: FailureSeverity
     description: str
+    type: str = "FAULT"
+    category: str = "FAULTS"
+
+    @property
+    def message(self) -> str:
+        return self.description
+
+    @property
+    def satellite_id(self) -> str:
+        return self.target_satellite_id
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize fault event to dictionary matching frontend MissionEvent schema."""
         return {
             "id": self.id,
             "timestamp": self.formatted_time,
-            "type": "FAULT",
-            "category": "FAULTS",
+            "type": self.type,
+            "category": self.category,
             "satelliteId": self.target_satellite_id,
             "severity": "critical" if self.severity == FailureSeverity.CRITICAL else "warning",
             "message": self.description,
