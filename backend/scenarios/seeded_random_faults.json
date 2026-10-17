@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "id": "seeded_random_faults",
+  "name": "Seeded Stochastic Fault Resilience Benchmark",
+  "description": "Injects a reproducible sequence of pseudo-random faults governed by a deterministic random seed (seed: 42). Validates that identical seeds yield identical fault sequences, state trajectories, and recovery metrics across independent runs.",
+  "configuration": {
+    "duration_sec": 15.0,
+    "time_step_sec": 0.5,
+    "time_warp": 1.0,
+    "max_isl_range_m": 5000000.0,
+    "random_seed": 42
+  },
+  "initial_invariants": {
+    "min_nominal_satellites": 12,
+    "expected_coordinator": "SAT-07",
+    "expected_relays": ["SAT-04", "SAT-08", "SAT-12"]
+  },
+  "stochastic_fault_generator": {
+    "count": 3,
+    "min_time_sec": 1.5,
+    "max_time_sec": 8.0,
+    "candidate_satellites": ["SAT-01", "SAT-02", "SAT-03", "SAT-05", "SAT-06", "SAT-09", "SAT-10", "SAT-11"],
+    "candidate_failures": [
+      { "type": "Compute Failure", "severity": "MODERATE" },
+      { "type": "Power Degradation", "severity": "MODERATE" },
+      { "type": "Communication Failure", "severity": "MODERATE" }
+    ]
+  },
+  "scheduled_faults": [],
+  "expected_outcomes": {
+    "max_detection_delay_sec": 1.0,
+    "expected_role_reassignments": [],
+    "expected_completed_recoveries": [],
+    "unrecoverable_satellites": [],
+    "allowed_unresolved_conditions": [],
+    "require_no_manual_intervention": true
+  },
+  "acceptance_thresholds": {
+    "min_nominal_at_end": 10,
+    "max_failed_at_end": 0,
+    "max_degraded_at_end": 2,
+    "min_active_links_at_end": 4,
+    "expected_coordinator_at_end": "SAT-07"
+  }
+}
