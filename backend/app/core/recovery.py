@@ -609,21 +609,24 @@ class RecoveryEngine:
 
         # 2. Anomaly string and autonomy status recomputation
         if failed_subsystems:
-            primary = failed_subsystems[0].upper()
-            sat.last_anomaly = f"CRITICAL {primary}_FAILURE"
+            primary = failed_subsystems[0].capitalize()
+            if not sat.last_anomaly or not any(f.lower() in sat.last_anomaly.lower() for f in failed_subsystems):
+                sat.last_anomaly = f"{primary} Failure (CRITICAL)"
             sat.autonomy_status = (
                 f"Autonomous {recovered_subsystem} recovery complete; "
                 f"satellite remains FAILED due to unrecovered {', '.join(failed_subsystems)}"
             )
         elif degraded_subsystems:
-            primary = degraded_subsystems[0].upper()
-            sat.last_anomaly = f"MODERATE {primary}_FAILURE"
+            primary = degraded_subsystems[0].capitalize()
+            if not sat.last_anomaly or not any(d.lower() in sat.last_anomaly.lower() for d in degraded_subsystems):
+                sat.last_anomaly = f"{primary} Degradation (MODERATE)"
             sat.autonomy_status = (
                 f"Autonomous {recovered_subsystem} recovery complete; "
                 f"satellite remains DEGRADED due to {', '.join(degraded_subsystems)}"
             )
         elif is_isolated:
-            sat.last_anomaly = "NODE_LOSS"
+            if not sat.last_anomaly:
+                sat.last_anomaly = "Node Loss (CRITICAL)"
             sat.autonomy_status = f"Autonomous {recovered_subsystem} recovery complete; node remains isolated"
         else:
             sat.last_anomaly = None
