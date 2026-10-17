@@ -17,6 +17,7 @@ from backend.app.core.orbit import (
 from backend.app.core.satellite import CubeSat, SatelliteRole, SatelliteState
 from backend.app.core.network import NetworkTopology, DEFAULT_MAX_ISL_RANGE_M
 from backend.app.core.faults import FaultEngine, FaultEvent, FailureType, FailureSeverity
+from backend.app.core.recovery import RecoveryEngine, RecoveryEvent
 
 
 # Canonical Constellation Planes matching ASTRANET architecture
@@ -73,6 +74,7 @@ class SwarmOrchestrator:
 
         self.network: NetworkTopology = NetworkTopology(max_range_m=max_isl_range_m)
         self.fault_engine: FaultEngine = FaultEngine()
+        self.recovery_engine: RecoveryEngine = RecoveryEngine()
 
         self._satellites_map: Dict[str, CubeSat] = {}
         self._satellites_list: List[CubeSat] = []
@@ -96,9 +98,11 @@ class SwarmOrchestrator:
         return None
 
     @property
-    def events(self) -> List[FaultEvent]:
-        """Return history of all recorded fault events."""
-        return self.fault_engine.event_history
+    def events(self) -> List[Any]:
+        """Return combined chronological history of all recorded fault and recovery events."""
+        all_events = list(self.fault_engine.event_history) + list(self.recovery_engine.event_history)
+        all_events.sort(key=lambda ev: ev.timestamp_sec)
+        return all_events
 
     def _sync_network_neighbors(self) -> None:
         """Update each satellite agent's network metric with current graph degrees."""
@@ -217,12 +221,24 @@ class SwarmOrchestrator:
         self.network.update(self._satellites_list)
         self._sync_network_neighbors()
 
+        # Phase 5: Autonomous Recovery Engine evaluation
+        self.recovery_engine.step(
+            sim_time=elapsed_sec,
+            satellites=self._satellites_list,
+            network=self.network,
+        )
+
+        # Re-sync network topology in case recovery reallocated roles or restored comms
+        self.network.update(self._satellites_list)
+        self._sync_network_neighbors()
+
         return elapsed_sec
 
     def reset(self, initial_elapsed_sec: float = 0.0) -> None:
         """Reset the simulation clock, fault engine, and restore all satellites to baseline state."""
         self.clock.reset(initial_elapsed_sec=initial_elapsed_sec)
         self.fault_engine.clear()
+        self.recovery_engine.clear()
         self._initialize_swarm()
 
     def get_telemetry_frame(self) -> Dict[str, Any]:
@@ -241,14 +257,20 @@ class SwarmOrchestrator:
         )
 
         coord = self.coordinator
-        coordinator_id = coord.id if coord else "NONE"
+        if coord:
+            coordinator_id = coord.id
+        elif self.recovery_engine.is_leadership_unresolved and self.recovery_engine._last_known_coordinator_id:
+            coordinator_id = self.recovery_engine._last_known_coordinator_id
+        else:
+            coordinator_id = "NONE"
 
+        all_events = self.events
         return {
             "clock": self.clock.to_dict(),
             "satellites": [sat.to_dict() for sat in self._satellites_list],
             "links": self.network.get_active_links(),
             "network": self.network.to_dict(),
-            "events": [ev.to_dict() for ev in reversed(self.fault_engine.event_history[-10:])],
+            "events": [ev.to_dict() for ev in reversed(all_events[-10:])],
             "swarmSummary": {
                 "total": self.satellite_count,
                 "nominal": nominal_count,
