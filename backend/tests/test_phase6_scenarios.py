@@ -155,6 +155,8 @@ class TestPhase6DualNodeFailureAcceptance(unittest.TestCase):
         self.assertTrue(any('PLANE A' in r['message'] for r in result.role_reassignments))
         plane_a_reassign = next(r for r in result.role_reassignments if 'PLANE A' in r['message'])
         self.assertIn(plane_a_reassign['satelliteId'], ['SAT-01', 'SAT-03'])
+        self.assertIn("active ISL neighbors", plane_a_reassign['message'])
+        self.assertNotIn("links restored", plane_a_reassign['message'])
 
         # 5. SAT-02 compute watchdog recovery completed successfully
         self.assertTrue(any(r['satelliteId'] == 'SAT-02' for r in result.completed_recoveries))
@@ -335,6 +337,44 @@ class TestPhase6IsolationAndIntegrity(unittest.TestCase):
         }
         self.assertTrue(required_keys.issubset(report_dict.keys()))
         self.assertEqual(report_dict["status"], "PASS")
+
+
+class TestPhase6AccuracyAndLeadershipSemantics(unittest.TestCase):
+    """Phase 6 Accuracy: Relay handover wording, bootstrap coordinator, and partition quorum."""
+
+    def test_relay_reassignment_message_precision(self) -> None:
+        """Verify that relay recovery reports active neighbor count rather than claiming links were restored."""
+        scen_def = load_scenario_from_file("dual_node_failure")
+        runner = ScenarioRunner()
+        result = runner.run(scen_def)
+
+        for reassign in result.role_reassignments:
+            msg = reassign["message"]
+            self.assertIn("promoted to RELAY", msg)
+            self.assertIn("active ISL neighbors", msg)
+            self.assertNotIn("restored 1 active ISL links", msg)
+            self.assertNotIn("links restored", msg)
+
+    def test_bootstrap_coordinator_documentation_and_invariant(self) -> None:
+        """Document and verify that SAT-07 is the initial bootstrap coordinator assigned
+        during swarm initialization at t=0, whereas runtime failover elections enforce
+        connected-component quorum rules and yield UNRESOLVED when quorum is unavailable.
+        """
+        # Baseline check: t=0 invariant verifies bootstrap coordinator SAT-07
+        scen_def = load_scenario_from_file("nominal_flight")
+        runner = ScenarioRunner()
+        result = runner.run(scen_def)
+        init_coord_checks = [c for c in result.acceptance_checks if "Initial Invariant: Coordinator" in c.name]
+        self.assertEqual(len(init_coord_checks), 1)
+        self.assertTrue(init_coord_checks[0].passed)
+        self.assertIn("Bootstrap coordinator verified as SAT-07", init_coord_checks[0].details)
+
+        # Quorum partition check: SAT-07 suffers node loss at t=2.0s; connected component has size < 7,
+        # so runtime election safely yields UNRESOLVED without split-brain or fabricated leadership.
+        partition_def = load_scenario_from_file("network_partition")
+        part_res = runner.run(partition_def)
+        self.assertEqual(part_res.baseline_metrics.coordinator_id, "SAT-07")
+        self.assertEqual(part_res.final_metrics.coordinator_id, "UNRESOLVED")
 
 
 if __name__ == "__main__":

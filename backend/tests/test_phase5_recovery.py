@@ -623,18 +623,19 @@ class TestPhase51TargetedDefectCorrections(unittest.TestCase):
 
     def test_defect7_relay_handover_connectivity_evaluation(self) -> None:
         """Fix 7: Relay handover evaluates the actual recomputed network graph and reports
-        whether active links were restored or handover is partial.
+        the promoted satellite's active ISL neighbor degree (not claiming restored links).
         """
         # Break SAT-04 relay in Plane A
         self.swarm.inject_fault("SAT-04", FailureType.COMMUNICATION_FAILURE, FailureSeverity.CRITICAL)
         self.swarm.step(1.0)
 
-        # Handover event must report active links restored or partial handover based on graph degrees
+        # Handover event must report active ISL neighbors or partial handover based on graph degrees
         reassignment_events = [
             ev for ev in self.swarm.events
             if ev.type == "RECOVERY" and ("Relay reassignment" in ev.message or "Relay handover partial" in ev.message)
         ]
         self.assertTrue(len(reassignment_events) >= 1)
         event_msg = reassignment_events[0].message
-        self.assertTrue("restored" in event_msg or "partial" in event_msg)
+        self.assertTrue("active ISL neighbors" in event_msg or "partial" in event_msg)
+        self.assertNotIn("links restored", event_msg)
 

@@ -72,9 +72,20 @@ class StochasticFaultGenerator(BaseModel):
 
 
 class InitialInvariants(BaseModel):
-    """Constellation invariants required at simulation start."""
+    """Constellation invariants required at simulation start (t=0).
+
+    Note on Leadership Architecture:
+    `expected_coordinator` (default: SAT-07) specifies the initial bootstrap coordinator
+    assigned during static swarm instantiation prior to any runtime failures.
+    Runtime failover elections are only triggered upon coordinator failure, where they
+    enforce connected-component quorum rules (requiring >= 7 reachable operational nodes).
+    In partitioned topologies lacking quorum, runtime elections result in UNRESOLVED leadership.
+    """
     min_nominal_satellites: int = Field(12, ge=1, le=12)
-    expected_coordinator: Optional[str] = "SAT-07"
+    expected_coordinator: Optional[str] = Field(
+        "SAT-07",
+        description="Bootstrap coordinator assigned during swarm initialization.",
+    )
     expected_relays: List[str] = Field(default_factory=lambda: ["SAT-04", "SAT-08", "SAT-12"])
 
 
