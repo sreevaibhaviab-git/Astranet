@@ -9,7 +9,7 @@
       "status": "PASS",
       "duration_sim_sec": 16.0,
       "steps_executed": 32,
-      "wall_clock_duration_sec": 0.0273,
+      "wall_clock_duration_sec": 0.0494,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -583,7 +583,7 @@
       "status": "PASS",
       "duration_sim_sec": 15.0,
       "steps_executed": 30,
-      "wall_clock_duration_sec": 0.0278,
+      "wall_clock_duration_sec": 0.0479,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -1098,7 +1098,7 @@
       "status": "PASS",
       "duration_sim_sec": 10.0,
       "steps_executed": 20,
-      "wall_clock_duration_sec": 0.0183,
+      "wall_clock_duration_sec": 0.0225,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -1489,7 +1489,7 @@
       "status": "PASS",
       "duration_sim_sec": 10.0,
       "steps_executed": 20,
-      "wall_clock_duration_sec": 0.0213,
+      "wall_clock_duration_sec": 0.0236,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -1856,7 +1856,7 @@
       "status": "PASS",
       "duration_sim_sec": 15.0,
       "steps_executed": 30,
-      "wall_clock_duration_sec": 0.0305,
+      "wall_clock_duration_sec": 0.0375,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
