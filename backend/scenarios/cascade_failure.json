@@ -1,0 +1,79 @@
+{
+  "version": "1.0.0",
+  "id": "cascade_failure",
+  "name": "Cascading Multi-Subsystem Failure & Containment",
+  "description": "Cascading failure scenario spanning permanent propulsion failure, relay communication disruption, recoverable compute fault, and catastrophic node loss. Validates that unrecoverable faults remain contained, recoverable faults are restored, and relay roles are preserved without infinite loops.",
+  "configuration": {
+    "duration_sec": 16.0,
+    "time_step_sec": 0.5,
+    "time_warp": 1.0,
+    "max_isl_range_m": 5000000.0,
+    "random_seed": null
+  },
+  "initial_invariants": {
+    "min_nominal_satellites": 12,
+    "expected_coordinator": "SAT-07",
+    "expected_relays": ["SAT-04", "SAT-08", "SAT-10"]
+  },
+  "scheduled_faults": [
+    {
+      "time_sec": 1.0,
+      "satellite_id": "SAT-05",
+      "failure_type": "Propulsion Failure",
+      "severity": "CRITICAL",
+      "description": "Propellant valve seizure disabling maneuvering"
+    },
+    {
+      "time_sec": 3.0,
+      "satellite_id": "SAT-08",
+      "failure_type": "Communication Failure",
+      "severity": "CRITICAL",
+      "description": "Transceiver hardware burnout on Plane B relay"
+    },
+    {
+      "time_sec": 5.0,
+      "satellite_id": "SAT-01",
+      "failure_type": "Compute Failure",
+      "severity": "MODERATE",
+      "description": "Onboard compute watchdog trip on Plane A observer"
+    },
+    {
+      "time_sec": 7.0,
+      "satellite_id": "SAT-10",
+      "failure_type": "Node Loss",
+      "severity": "CRITICAL",
+      "description": "Catastrophic power bus failure on Plane C relay"
+    }
+  ],
+  "expected_outcomes": {
+    "max_detection_delay_sec": 1.0,
+    "expected_role_reassignments": [
+      {
+        "plane": "PLANE B",
+        "new_role": "RELAY",
+        "replaced_satellite_id": "SAT-08"
+      },
+      {
+        "plane": "PLANE C",
+        "new_role": "RELAY",
+        "replaced_satellite_id": "SAT-10"
+      }
+    ],
+    "expected_completed_recoveries": [
+      {
+        "satellite_id": "SAT-01",
+        "action_type": "RESET_COMPUTE"
+      }
+    ],
+    "unrecoverable_satellites": ["SAT-05", "SAT-08", "SAT-10"],
+    "allowed_unresolved_conditions": [],
+    "require_no_manual_intervention": true
+  },
+  "acceptance_thresholds": {
+    "min_nominal_at_end": 9,
+    "max_failed_at_end": 3,
+    "max_degraded_at_end": 0,
+    "min_active_links_at_end": 3,
+    "expected_coordinator_at_end": "SAT-07"
+  }
+}
