@@ -34,7 +34,11 @@ export default function App() {
     const handleHash = () => {
       const hash = window.location.hash;
       const search = window.location.search;
-      if (hash === "#mission-control" || search.includes("view=mission-control")) {
+      if (
+        hash === "#mission-control" ||
+        hash === "#/mission-control" ||
+        search.includes("view=mission-control")
+      ) {
         setIsMissionControlOpen(true);
       }
     };
@@ -51,7 +55,7 @@ export default function App() {
 
   const closeMissionControl = () => {
     setIsMissionControlOpen(false);
-    if (window.location.hash === "#mission-control") {
+    if (window.location.hash === "#mission-control" || window.location.hash === "#/mission-control") {
       history.pushState(null, "", window.location.pathname);
     }
   };
