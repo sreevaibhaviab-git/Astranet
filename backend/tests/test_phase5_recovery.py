@@ -25,6 +25,8 @@ from backend.app.core.satellite import (
 )
 from backend.app.core.faults import FailureType, FailureSeverity
 from backend.app.core.recovery import RecoveryEngine, RecoveryPhase, RecoveryEvent
+from backend.app.core.network import NetworkTopology
+from backend.app.core.orbit import KeplerianOrbit
 from backend.app.core.swarm import SwarmOrchestrator
 
 
@@ -34,7 +36,10 @@ class TestPhase5CoordinatorElection(unittest.TestCase):
     def setUp(self) -> None:
         self.swarm = SwarmOrchestrator()
 
-    def test_coordinator_failure_triggers_deterministic_election(self) -> None:
+    def test_coordinator_failure_in_disconnected_graph_results_in_unresolved_leadership(self) -> None:
+        """Requirement 3 & 4: Coordinator loss in partitioned constellation must result in
+        UNRESOLVED leadership, without publishing failed coordinator or electing split-brain leaders.
+        """
         # Initial coordinator must be SAT-07
         self.assertIsNotNone(self.swarm.coordinator)
         self.assertEqual(self.swarm.coordinator.id, "SAT-07")
@@ -55,24 +60,52 @@ class TestPhase5CoordinatorElection(unittest.TestCase):
         self.assertNotEqual(sat07.role, SatelliteRole.COORDINATOR)
         self.assertEqual(sat07.state, SatelliteState.ISOLATED)
 
-        # A new coordinator must have been elected
-        new_coord = self.swarm.coordinator
-        self.assertIsNotNone(new_coord)
-        self.assertNotEqual(new_coord.id, "SAT-07")
-        self.assertEqual(new_coord.role, SatelliteRole.COORDINATOR)
-        self.assertEqual(new_coord.state, SatelliteState.NOMINAL)
+        # In baseline graph at t=0 (6 partitions of size 2), no connected component meets quorum of 7
+        self.assertTrue(self.swarm.recovery_engine.is_leadership_unresolved)
+        self.assertIsNone(self.swarm.coordinator)
 
-        # Authoritative telemetry frame must reflect new coordinator
+        # Telemetry frame must publish UNRESOLVED, never the failed SAT-07
         frame = self.swarm.get_telemetry_frame()
-        self.assertEqual(frame["swarmSummary"]["coordinatorId"], new_coord.id)
+        self.assertEqual(frame["swarmSummary"]["coordinatorId"], "UNRESOLVED")
+        self.assertNotEqual(frame["swarmSummary"]["coordinatorId"], "SAT-07")
+        self.assertEqual(self.swarm.recovery_engine.last_known_coordinator_id, "SAT-07")
 
-        # A RECOVERY event must be present recording the election
+        # Recovery event must record that election is unresolved due to lack of connected quorum
+        unresolved_events = [
+            ev for ev in self.swarm.events
+            if ev.type == "RECOVERY" and "no connected network component meets reachable quorum" in ev.message
+        ]
+        self.assertTrue(len(unresolved_events) >= 1)
+
+    def test_successful_election_within_connected_component(self) -> None:
+        """Requirement 4: When an eligible connected component meets reachable quorum (>=7)
+        and strict majority of operational nodes, election deterministically elects a new coordinator.
+        """
+        connected_net = NetworkTopology()
+        # Connect SAT-01 through SAT-08 (7 operational nodes excluding failed SAT-07)
+        connected_ids = ["SAT-01", "SAT-02", "SAT-03", "SAT-04", "SAT-05", "SAT-06", "SAT-08"]
+        for i in range(len(connected_ids) - 1):
+            connected_net._graph.add_edge(connected_ids[i], connected_ids[i + 1])
+
+        self.swarm.recovery_engine._execute_coordinator_election(
+            sim_time=1.0,
+            satellites=self.swarm.satellites,
+            network=connected_net,
+            old_coordinator_id="SAT-07",
+        )
+
+        self.assertFalse(self.swarm.recovery_engine.is_leadership_unresolved)
+        winner_id = self.swarm.recovery_engine.last_known_coordinator_id
+        self.assertIn(winner_id, connected_ids)
+        winner_sat = self.swarm.get_satellite(winner_id)
+        self.assertEqual(winner_sat.role, SatelliteRole.COORDINATOR)
+
         election_events = [
             ev for ev in self.swarm.events
             if ev.type == "RECOVERY" and "elected swarm coordinator" in ev.message
         ]
         self.assertTrue(len(election_events) >= 1)
-        self.assertIn(new_coord.id, election_events[0].message)
+        self.assertIn(winner_id, election_events[0].message)
 
     def test_election_blocked_when_global_quorum_unavailable(self) -> None:
         # Disable 6 satellites out of 12 (leaving 6 operational, less than quorum of 7)
@@ -304,9 +337,11 @@ class TestPhase5CascadingAndTiming(unittest.TestCase):
         total_events = len(self.swarm.events)
         self.assertTrue(total_events < 20)
 
-        # Swarm coordinator must be unique and consistent
+        # Swarm coordinator must be consistent (0 active coordinators when partitioned and unresolved)
         coordinators = [s for s in self.swarm.satellites if s.role == SatelliteRole.COORDINATOR]
-        self.assertEqual(len(coordinators), 1)
+        self.assertEqual(len(coordinators), 0)
+        self.assertIsNone(self.swarm.coordinator)
+        self.assertEqual(self.swarm.get_telemetry_frame()["swarmSummary"]["coordinatorId"], "UNRESOLVED")
 
     def test_recovery_timer_advances_with_simulation_time_not_wall_clock(self) -> None:
         sat = self.swarm.get_satellite("SAT-03")
