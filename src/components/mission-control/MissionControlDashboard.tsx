@@ -29,8 +29,8 @@ export default function MissionControlDashboard({
     clock,
     swarmSummary,
     links,
-    connectionStatus,
     isConnected,
+    isReconnecting,
     isPaused,
     error: telemetryError,
     injectFault: backendInjectFault,
@@ -211,7 +211,7 @@ export default function MissionControlDashboard({
           )}
 
           {/* LIVE SIM / RECONNECTING / STANDALONE MOCK badge */}
-          {connectionStatus === "connected" ? (
+          {isConnected ? (
             <div
               className="flex items-center gap-1.5 text-xs text-[#10B981] font-medium"
               title="Connected to FastAPI WebSocket /ws/telemetry"
@@ -224,7 +224,7 @@ export default function MissionControlDashboard({
                 </span>
               )}
             </div>
-          ) : connectionStatus === "reconnecting" ? (
+          ) : isReconnecting ? (
             <div
               className="flex items-center gap-1.5 text-xs text-[#F59E0B] font-medium"
               title="Reconnecting to backend with exponential backoff..."
