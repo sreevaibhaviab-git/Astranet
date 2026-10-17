@@ -559,6 +559,76 @@ class RecoveryEngine:
                     failure_severity=severity.value,
                 )
 
+    def _recompute_satellite_state_and_anomaly(
+        self,
+        sat: CubeSat,
+        recovered_subsystem: str,
+        completing_task_id: Optional[str] = None,
+    ) -> None:
+        """Recompute overall satellite health state, last anomaly, and autonomy status.
+
+        Restores only the subsystem associated with the completed recovery task.
+        Preserves concurrent failures (including permanent propulsion and communications failures).
+        Ensures a recovering satellite cannot be marked NOMINAL while an unrecoverable failure remains.
+        """
+        sub = sat.subsystems
+        failed_subsystems: List[str] = []
+        degraded_subsystems: List[str] = []
+
+        subsystem_list = [
+            ("communications", sub.communications),
+            ("compute", sub.compute),
+            ("propulsion", sub.propulsion),
+            ("power", sub.power),
+            ("navigation", sub.navigation),
+            ("payload", sub.payload),
+            ("attitudeControl", sub.attitudeControl),
+        ]
+
+        for name, status in subsystem_list:
+            if status == SubsystemStatus.FAILED:
+                failed_subsystems.append(name)
+            elif status == SubsystemStatus.DEGRADED:
+                degraded_subsystems.append(name)
+
+        has_other_active_tasks = any(
+            t.satellite_id == sat.id and (completing_task_id is None or t.task_id != completing_task_id)
+            for t in self._active_tasks.values()
+        )
+        is_isolated = (sat.role == SatelliteRole.ISOLATED or sat.state == SatelliteState.ISOLATED)
+
+        # 1. State recomputation
+        if is_isolated or failed_subsystems:
+            sat.state = SatelliteState.ISOLATED if is_isolated else SatelliteState.FAILED
+        elif has_other_active_tasks:
+            sat.state = SatelliteState.RECOVERING
+        elif degraded_subsystems:
+            sat.state = SatelliteState.DEGRADED
+        else:
+            sat.state = SatelliteState.NOMINAL
+
+        # 2. Anomaly string and autonomy status recomputation
+        if failed_subsystems:
+            primary = failed_subsystems[0].upper()
+            sat.last_anomaly = f"CRITICAL {primary}_FAILURE"
+            sat.autonomy_status = (
+                f"Autonomous {recovered_subsystem} recovery complete; "
+                f"satellite remains FAILED due to unrecovered {', '.join(failed_subsystems)}"
+            )
+        elif degraded_subsystems:
+            primary = degraded_subsystems[0].upper()
+            sat.last_anomaly = f"MODERATE {primary}_FAILURE"
+            sat.autonomy_status = (
+                f"Autonomous {recovered_subsystem} recovery complete; "
+                f"satellite remains DEGRADED due to {', '.join(degraded_subsystems)}"
+            )
+        elif is_isolated:
+            sat.last_anomaly = "NODE_LOSS"
+            sat.autonomy_status = f"Autonomous {recovered_subsystem} recovery complete; node remains isolated"
+        else:
+            sat.last_anomaly = None
+            sat.autonomy_status = f"Autonomous {recovered_subsystem} recovery complete: nominal state validated"
+
     def _advance_and_validate_active_tasks(
         self,
         sim_time: float,
@@ -566,12 +636,12 @@ class RecoveryEngine:
         network: NetworkTopology,
     ) -> None:
         """Advance active timed recoveries and validate restored health upon timer expiry."""
-        completed_sat_ids: List[str] = []
+        completed_tasks: List[Tuple[str, RecoveryTask]] = []
 
         for sat_id, task in list(self._active_tasks.items()):
             sat = next((s for s in satellites if s.id == sat_id), None)
             if not sat:
-                completed_sat_ids.append(sat_id)
+                completed_tasks.append((sat_id, task))
                 continue
 
             # Check if simulation elapsed time has reached target completion
@@ -583,9 +653,7 @@ class RecoveryEngine:
                     sat.capabilities.compute = True
                     sat.compute = 30.0
                     sat.trust = min(1.0, sat.trust + 0.05)
-                    sat.state = SatelliteState.NOMINAL
-                    sat.autonomy_status = "Autonomous compute recovery complete: nominal software state validated"
-                    sat.last_anomaly = None
+                    self._recompute_satellite_state_and_anomaly(sat, "compute", completing_task_id=task.task_id)
 
                     self._record_event(
                         sim_time_sec=sim_time,
@@ -602,9 +670,7 @@ class RecoveryEngine:
                     sat.network.link_quality = 95.0
                     sat.network.packet_loss = 0.5
                     sat.trust = min(1.0, sat.trust + 0.05)
-                    sat.state = SatelliteState.NOMINAL
-                    sat.autonomy_status = "Autonomous comms recovery complete: transceiver nominal"
-                    sat.last_anomaly = None
+                    self._recompute_satellite_state_and_anomaly(sat, "comms", completing_task_id=task.task_id)
 
                     self._record_event(
                         sim_time_sec=sim_time,
@@ -616,26 +682,28 @@ class RecoveryEngine:
                     )
 
                 elif action == "RECHARGE_POWER":
-                    sat.battery = min(95.0, sat.battery + 35.0)
+                    recharge_amount = min(25.0, task.duration_sec * self.SOLAR_RECHARGE_RATE_PCT_PER_SEC)
+                    sat.battery = min(self.MAX_RECOVERED_BATTERY_PCT, sat.battery + recharge_amount)
                     sat.subsystems.power = SubsystemStatus.NOMINAL
                     sat.capabilities.sensing = True
-                    sat.state = SatelliteState.NOMINAL
-                    sat.autonomy_status = "Autonomous power recovery complete: battery state-of-charge restored"
-                    sat.last_anomaly = None
+                    self._recompute_satellite_state_and_anomaly(sat, "power", completing_task_id=task.task_id)
 
                     self._record_event(
                         sim_time_sec=sim_time,
                         satellite_id=sat.id,
-                        message=f"{sat.id} power recovery complete: battery recharged to {sat.battery:.1f}%",
+                        message=f"{sat.id} power recovery complete: battery recharged by +{recharge_amount:.1f}% to {sat.battery:.1f}% SoC (bounded model)",
                         severity="nominal",
                         failure_type=task.failure_type.value,
                         failure_severity=task.severity.value,
                     )
 
-                completed_sat_ids.append(sat_id)
+                completed_tasks.append((sat_id, task))
 
-        for sat_id in completed_sat_ids:
+        for sat_id, task in completed_tasks:
             self._active_tasks.pop(sat_id, None)
+            # Release processed anomaly tracking so subsequent recoverable occurrences can be handled
+            anomaly_key = (task.satellite_id, task.failure_type.value, task.severity.value)
+            self._processed_anomalies.discard(anomaly_key)
 
     # =========================================================================
     # DYNAMIC COORDINATOR ELECTION
@@ -664,6 +732,13 @@ class RecoveryEngine:
 
         if not is_coord_available:
             old_coord_id = current_coord.id if current_coord else (self._last_known_coordinator_id or "NONE")
+            if current_coord:
+                # Strip coordinator role from the unavailable coordinator to prevent telemetry contradictions
+                current_coord.role = (
+                    SatelliteRole.ISOLATED
+                    if current_coord.state in (SatelliteState.FAILED, SatelliteState.ISOLATED)
+                    else SatelliteRole.OBSERVER
+                )
             self._execute_coordinator_election(sim_time, satellites, network, old_coord_id)
 
     def _execute_coordinator_election(
@@ -673,7 +748,7 @@ class RecoveryEngine:
         network: NetworkTopology,
         old_coordinator_id: str,
     ) -> None:
-        """Elect new coordinator using global quorum and normalized multi-factor resource ranking."""
+        """Elect new coordinator using partition-aware connected quorum and multi-factor ranking."""
         # 1. Filter operational and eligible candidates
         operational_nodes: List[CubeSat] = []
         for s in satellites:
@@ -687,8 +762,9 @@ class RecoveryEngine:
                 continue
             operational_nodes.append(s)
 
-        # 2. Check Global Quorum (majority of 12-satellite constellation)
-        if len(operational_nodes) < self.GLOBAL_ELECTION_QUORUM:
+        # 2. Check Global Quorum
+        total_ops = len(operational_nodes)
+        if total_ops < self.global_election_quorum:
             if not self._leadership_unresolved:
                 self._leadership_unresolved = True
                 self._record_event(
@@ -696,14 +772,49 @@ class RecoveryEngine:
                     satellite_id=None,
                     message=(
                         f"Coordinator election failed: insufficient global quorum "
-                        f"({len(operational_nodes)}/{self.GLOBAL_ELECTION_QUORUM} operational nodes required); "
+                        f"({total_ops}/{self.global_election_quorum} operational nodes required); "
                         f"leadership unresolved (last known: {old_coordinator_id})"
                     ),
                     severity="warning",
                 )
             return
 
-        # 3. Deterministic normalized candidate scoring
+        # 3. Partition-Aware Component Evaluation
+        # Require reachable quorum within candidate's connected component and strict majority
+        # of all operational nodes (> total_ops // 2) to prevent split-brain leadership.
+        connected_components = network.get_connected_components()
+        op_map = {s.id: s for s in operational_nodes}
+
+        eligible_component_ops: Optional[List[CubeSat]] = None
+        max_component_op_count = 0
+
+        for comp in connected_components:
+            comp_ops = [op_map[sat_id] for sat_id in comp if sat_id in op_map]
+            if len(comp_ops) > max_component_op_count:
+                max_component_op_count = len(comp_ops)
+
+            # Quorum requires reachable connected quorum and strict majority of operational nodes
+            if len(comp_ops) >= self.connected_election_quorum and len(comp_ops) > (total_ops // 2):
+                eligible_component_ops = comp_ops
+                break
+
+        if eligible_component_ops is None:
+            if not self._leadership_unresolved:
+                self._leadership_unresolved = True
+                self._record_event(
+                    sim_time_sec=sim_time,
+                    satellite_id=None,
+                    message=(
+                        f"Coordinator election unresolved: no connected network component meets "
+                        f"reachable quorum (largest component has {max_component_op_count} operational nodes, "
+                        f"required: {self.connected_election_quorum} with strict majority > {total_ops // 2}); "
+                        f"leadership unresolved (last known: {old_coordinator_id})"
+                    ),
+                    severity="warning",
+                )
+            return
+
+        # 4. Deterministic normalized candidate scoring within eligible connected component
         def compute_candidate_score(cand: CubeSat) -> float:
             s_bat = cand.battery / 100.0
             s_prop = cand.propellant / 100.0
@@ -723,21 +834,25 @@ class RecoveryEngine:
 
         scored_candidates = [
             (compute_candidate_score(c), c.id, c)
-            for c in operational_nodes
+            for c in eligible_component_ops
         ]
         # Sort by: -score, then alphabetical satellite ID for strict determinism
         scored_candidates.sort(key=lambda item: (-round(item[0], 4), item[1]))
 
         winner_score, winner_id, winner_sat = scored_candidates[0]
 
-        # 4. Apply role updates consistently
+        # 5. Apply role updates consistently
         for s in satellites:
             if s.id == winner_id:
                 s.role = SatelliteRole.COORDINATOR
                 s.autonomy_status = f"Elected swarm coordinator (score: {winner_score:.2f})"
             elif s.role == SatelliteRole.COORDINATOR:
                 # Demote former coordinator if it was not the winner
-                s.role = SatelliteRole.ISOLATED if s.state in (SatelliteState.FAILED, SatelliteState.ISOLATED) else SatelliteRole.OBSERVER
+                s.role = (
+                    SatelliteRole.ISOLATED
+                    if s.state in (SatelliteState.FAILED, SatelliteState.ISOLATED)
+                    else SatelliteRole.OBSERVER
+                )
 
         self._last_known_coordinator_id = winner_id
         self._leadership_unresolved = False
@@ -747,6 +862,7 @@ class RecoveryEngine:
             satellite_id=winner_id,
             message=(
                 f"Dynamic election succeeded: {winner_id} elected swarm coordinator "
+                f"within connected component of {len(eligible_component_ops)} nodes "
                 f"(score: {winner_score:.2f}) replacing {old_coordinator_id}"
             ),
             severity="nominal",
@@ -821,11 +937,36 @@ class RecoveryEngine:
 
         replacement.role = SatelliteRole.RELAY
         replacement.capabilities.relay = True
-        replacement.autonomy_status = f"Promoted to RELAY in {replacement.plane} replacing {broken_relay.id}"
 
-        self._record_event(
-            sim_time_sec=sim_time,
-            satellite_id=replacement.id,
-            message=f"Relay reassignment: {replacement.id} promoted to RELAY in {replacement.plane} replacing {broken_relay.id}",
-            severity="nominal",
-        )
+        # Re-evaluate network graph to evaluate if useful connectivity was restored
+        network.update(satellites)
+        restored_neighbors = network.get_neighbor_count(replacement.id)
+
+        if restored_neighbors > 0:
+            replacement.autonomy_status = (
+                f"Promoted to RELAY in {replacement.plane} replacing {broken_relay.id} "
+                f"({restored_neighbors} active ISL links)"
+            )
+            self._record_event(
+                sim_time_sec=sim_time,
+                satellite_id=replacement.id,
+                message=(
+                    f"Relay reassignment: {replacement.id} promoted to RELAY in {replacement.plane} "
+                    f"replacing {broken_relay.id} (restored {restored_neighbors} active ISL links)"
+                ),
+                severity="nominal",
+            )
+        else:
+            replacement.autonomy_status = (
+                f"Assigned RELAY in {replacement.plane} replacing {broken_relay.id} "
+                f"(partial handover: 0 active links)"
+            )
+            self._record_event(
+                sim_time_sec=sim_time,
+                satellite_id=replacement.id,
+                message=(
+                    f"Relay handover partial: {replacement.id} promoted to RELAY in {replacement.plane} "
+                    f"replacing {broken_relay.id}, but no active ISL links restored (0 neighbors)"
+                ),
+                severity="warning",
+            )
