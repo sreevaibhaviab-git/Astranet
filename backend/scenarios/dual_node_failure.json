@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "id": "dual_node_failure",
-  "name": "Dual-Node Failure & Autonomous Self-Healing",
-  "description": "Primary Phase 6 Benchmark: Nominal flight baseline, followed by dual-node failure: critical relay transmitter loss on SAT-04 in Plane A at t=2.0s, followed by moderate compute failure on SAT-02 at t=4.0s. Demonstrates autonomous fault detection, peer observation, relay role reassignment in Plane A to an eligible healthy observer, flight software watchdog reset recovery for SAT-02, and dynamic network self-healing without manual operator intervention.",
+  "name": "Dual-Node Failure & Autonomous Local Recovery",
+  "description": "Primary Phase 6 Benchmark: Nominal flight baseline, followed by dual-node failure: critical relay transmitter loss on SAT-04 in Plane A at t=2.0s, followed by moderate compute failure on SAT-02 at t=4.0s. Demonstrates autonomous fault detection, peer observation, intra-plane relay role reassignment in Plane A to an eligible healthy observer, flight software watchdog reset recovery for SAT-02, and local link preservation without manual operator intervention. Note: SAT-07 is a bootstrap coordinator assigned during swarm initialization; relay role reassignment preserves local ISL connectivity for the promoted node rather than establishing global end-to-end network connectivity across partitioned components.",
   "configuration": {
     "duration_sec": 15.0,
     "time_step_sec": 0.5,

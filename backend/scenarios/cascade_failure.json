@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "id": "cascade_failure",
   "name": "Cascading Multi-Subsystem Failure & Containment",
-  "description": "Cascading failure scenario spanning permanent propulsion failure, relay communication disruption, recoverable compute fault, and catastrophic node loss. Validates that unrecoverable faults remain contained, recoverable faults are restored, and relay roles are preserved without infinite loops.",
+  "description": "Cascading failure scenario spanning permanent propulsion failure, relay communication disruption, recoverable compute fault, and catastrophic node loss. Validates that unrecoverable faults remain contained, recoverable faults are cleared, and intra-plane relay roles and local active links are preserved without claiming global network self-healing or restored end-to-end connectivity across partitioned components. SAT-07 is the initial bootstrap coordinator assigned at swarm initialization.",
   "configuration": {
     "duration_sec": 16.0,
     "time_step_sec": 0.5,
