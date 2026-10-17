@@ -12,6 +12,7 @@ interface CesiumGlobeProps {
   onSelectSatellite: (id: string) => void;
   missionTime: string;
   coordinatorId: string;
+  activeLinks?: Array<[string, string]>;
 }
 
 type PlaneConfig = {
@@ -126,11 +127,13 @@ export default function CesiumGlobe({
   onSelectSatellite,
   missionTime,
   coordinatorId,
+  activeLinks,
 }: CesiumGlobeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const creditRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const satellitesRef = useRef(satellites);
+  const activeLinksRef = useRef(activeLinks);
   const selectedRef = useRef(selectedSatelliteId);
   const hoveredRef = useRef<string | null>(null);
   const viewModeRef = useRef<ViewMode>("ORBIT");
@@ -142,12 +145,22 @@ export default function CesiumGlobe({
   const [imageryStatus, setImageryStatus] = useState<"loading" | "arcgis" | "fallback" | "error">("loading");
 
   satellitesRef.current = satellites;
+  activeLinksRef.current = activeLinks;
   selectedRef.current = selectedSatelliteId;
   viewModeRef.current = viewMode;
 
   const satelliteIcon = useMemo(() => satelliteSvgDataUri(), []);
 
   const getSatellitePosition = useCallback((sat: SatelliteTelemetry) => {
+    // If live digital-twin geographic coordinates are provided by backend, use them directly
+    if (sat.position && typeof sat.position.lat === "number" && typeof sat.position.lon === "number") {
+      return Cesium.Cartesian3.fromDegrees(
+        sat.position.lon,
+        sat.position.lat,
+        (sat.position.altKm || 550) * 1000
+      );
+    }
+    // Fallback parametric formula when running in standalone mock mode
     const elapsedSec = (performance.now() - startTimeRef.current) / 1000;
     const periodSec = Math.max(60, sat.orbitPeriodSec || 95.5);
     const phase = Cesium.Math.toRadians(sat.phaseDeg) + (elapsedSec / periodSec) * Math.PI * 2;
@@ -353,25 +366,38 @@ export default function CesiumGlobe({
         });
 
         // Network links are native Cesium polylines and are hidden in the default Orbit view.
-        NETWORK_LINKS.forEach(([aId, bId], index) => {
-          viewer!.entities.add({
-            id: `link:${index}`,
-            show: false,
-            polyline: {
-              positions: new Cesium.CallbackProperty(() => {
-                const a = satellitesRef.current.find((sat) => sat.id === aId);
-                const b = satellitesRef.current.find((sat) => sat.id === bId);
-                if (!a || !b) return [];
-                return [getSatellitePosition(a), getSatellitePosition(b)];
-              }, false),
-              width: 1,
-              material: new Cesium.ColorMaterialProperty(
-                Cesium.Color.fromCssColorString("#5C9FD6").withAlpha(0.34)
-              ),
-              arcType: Cesium.ArcType.NONE,
-            },
-          });
-        });
+        // Generate entities for all satellite pairs and display only those active in backend telemetry.
+        const allSats = satellitesRef.current;
+        for (let i = 0; i < allSats.length; i++) {
+          for (let j = i + 1; j < allSats.length; j++) {
+            const aId = allSats[i].id;
+            const bId = allSats[j].id;
+            viewer!.entities.add({
+              id: `link:${aId}-${bId}`,
+              show: false,
+              polyline: {
+                positions: new Cesium.CallbackProperty(() => {
+                  const links = activeLinksRef.current;
+                  const isActive = links
+                    ? links.some(([u, v]) => (u === aId && v === bId) || (u === bId && v === aId))
+                    : NETWORK_LINKS.some(([u, v]) => (u === aId && v === bId) || (u === bId && v === aId));
+
+                  if (!isActive) return [];
+
+                  const a = satellitesRef.current.find((sat) => sat.id === aId);
+                  const b = satellitesRef.current.find((sat) => sat.id === bId);
+                  if (!a || !b) return [];
+                  return [getSatellitePosition(a), getSatellitePosition(b)];
+                }, false),
+                width: 1,
+                material: new Cesium.ColorMaterialProperty(
+                  Cesium.Color.fromCssColorString("#5C9FD6").withAlpha(0.34)
+                ),
+                arcType: Cesium.ArcType.NONE,
+              },
+            });
+          }
+        }
 
         // Mission-mode overlay: a restrained observation target over India, not fake continents.
         viewer.entities.add({
