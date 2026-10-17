@@ -92,13 +92,25 @@ class RecoveryEngine:
 
     # Global Constellation Quorum for Coordinator Election (majority of 12-satellite constellation)
     GLOBAL_ELECTION_QUORUM: int = 7
+    # Connected Component Election Quorum (reachable operational nodes in component)
+    CONNECTED_ELECTION_QUORUM: int = 7
 
     # Recovery Durations in Simulation Seconds
     DURATION_COMPUTE_RESET_SEC: float = 3.0
     DURATION_COMMS_RESET_SEC: float = 4.0
     DURATION_POWER_RECHARGE_SEC: float = 5.0
 
-    def __init__(self) -> None:
+    # Rate-limited bounded solar power recharge model parameters
+    SOLAR_RECHARGE_RATE_PCT_PER_SEC: float = 5.0  # 5.0% SoC per second
+    MAX_RECOVERED_BATTERY_PCT: float = 95.0
+
+    def __init__(
+        self,
+        connected_election_quorum: int = 7,
+        global_election_quorum: int = 7,
+    ) -> None:
+        self.connected_election_quorum: int = connected_election_quorum
+        self.global_election_quorum: int = global_election_quorum
         self._events: List[RecoveryEvent] = []
         self._active_tasks: Dict[str, RecoveryTask] = {}
         # Tracks anomalies that have already been handled to prevent unbounded duplicate event storms
@@ -107,6 +119,11 @@ class RecoveryEngine:
         self._last_known_coordinator_id: Optional[str] = "SAT-07"
         self._leadership_unresolved: bool = False
         self._event_counter: int = 0
+
+    @property
+    def last_known_coordinator_id(self) -> Optional[str]:
+        """Last known coordinator satellite ID prior to leadership vacancy."""
+        return self._last_known_coordinator_id
 
     @property
     def event_history(self) -> List[RecoveryEvent]:
@@ -215,13 +232,21 @@ class RecoveryEngine:
                 continue
 
             # Record successful verification event
+            if total_peers == 1:
+                verification_msg = (
+                    f"Local peer observation confirmed anomaly for {sat.id} "
+                    f"(single-peer check; no multi-peer consensus; simulated telemetry inspection)"
+                )
+            else:
+                verification_msg = (
+                    f"Multi-peer observation confirmed anomaly for {sat.id} "
+                    f"({votes_for}/{total_peers} peers in agreement; threshold {self.PEER_QUORUM_RATIO:.0%})"
+                )
+
             self._record_event(
                 sim_time_sec=sim_time,
                 satellite_id=sat.id,
-                message=(
-                    f"Peer consensus confirmed anomaly for {sat.id} "
-                    f"({votes_for}/{total_peers} peers in quorum; threshold {self.PEER_QUORUM_RATIO:.0%})"
-                ),
+                message=verification_msg,
                 severity="warning",
                 failure_type=f_type.value,
                 failure_severity=f_sev.value,
@@ -297,7 +322,14 @@ class RecoveryEngine:
         satellites: List[CubeSat],
         network: NetworkTopology,
     ) -> Tuple[bool, int, int, str]:
-        """Verify suspected anomaly through peer consensus over geometric/active ISLs.
+        """Verify suspected anomaly through peer observation over geometric ISLs.
+
+        NOTE ON CONSENSUS & SENSOR FIDELITY:
+        Peer verification in this simulation is a deterministic heuristic where neighboring
+        spacecraft with line-of-sight inspect shared target telemetry flags and link responsiveness.
+        This does NOT represent cryptographic Byzantine consensus or noisy distributed sensor
+        filtering. A single peer observation is treated as a local sanity check with limited
+        confidence, not strong consensus.
 
         Returns:
             (verified: bool, votes_for: int, total_peers: int, reason: str)
@@ -330,6 +362,13 @@ class RecoveryEngine:
         total_peers = len(candidate_peers)
 
         # Quorum Check: Must have at least MIN_PEER_QUORUM_COUNT peers within range and LOS
+        if total_peers == 0:
+            return (
+                False,
+                0,
+                0,
+                f"isolated node: 0 reachable peers in line of sight (minimum {self.MIN_PEER_QUORUM_COUNT} required)",
+            )
         if total_peers < self.MIN_PEER_QUORUM_COUNT:
             return (
                 False,
@@ -354,7 +393,11 @@ class RecoveryEngine:
 
         agreement_ratio = votes_for / total_peers
         if agreement_ratio >= self.PEER_QUORUM_RATIO:
-            return True, votes_for, total_peers, "Quorum verified"
+            if total_peers == 1:
+                reason = "Single-peer local observation confirmed anomaly (limited confidence; single-peer check)"
+            else:
+                reason = f"Multi-peer observation confirmed ({votes_for}/{total_peers} peers in agreement)"
+            return True, votes_for, total_peers, reason
         else:
             return (
                 False,
