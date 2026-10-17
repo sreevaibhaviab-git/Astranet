@@ -463,6 +463,7 @@ class RecoveryEngine:
         else:
             # Unrecoverable hardware failure: Safe containment
             if action_type == "ISOLATE_NODE":
+                was_relay = impact.get("was_relay", False)
                 sat.state = SatelliteState.ISOLATED
                 sat.role = SatelliteRole.ISOLATED
                 sat.autonomy_status = "Node declared lost: permanently isolated from swarm topology"
@@ -474,6 +475,9 @@ class RecoveryEngine:
                     failure_type=failure_type.value,
                     failure_severity=severity.value,
                 )
+                if was_relay:
+                    self._reallocate_relay_in_plane(sim_time, sat, satellites, network)
+
             elif action_type == "ISOLATE_PROPULSION":
                 sat.capabilities.maneuvering = False
                 sat.autonomy_status = "Propulsion hardware unrecoverable: maneuvering disabled; assigned to passive ballistic tracking"
@@ -486,6 +490,7 @@ class RecoveryEngine:
                     failure_severity=severity.value,
                 )
             elif action_type == "UNRECOVERABLE_COMMS":
+                was_relay = impact.get("was_relay", False) or (sat.role == SatelliteRole.RELAY)
                 sat.capabilities.relay = False
                 if sat.role == SatelliteRole.RELAY:
                     sat.role = SatelliteRole.OBSERVER
@@ -498,6 +503,8 @@ class RecoveryEngine:
                     failure_type=failure_type.value,
                     failure_severity=severity.value,
                 )
+                if was_relay:
+                    self._reallocate_relay_in_plane(sim_time, sat, satellites, network)
             else:
                 sat.autonomy_status = f"Anomaly unrecoverable under flight rules: {failure_type.value}"
                 self._record_event(
