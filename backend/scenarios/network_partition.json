@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "id": "network_partition",
+  "name": "Network Partition & Quorum-Constrained Leadership",
+  "description": "Evaluates swarm behavior under constellation network partitions where global and connected quorum is unavailable. Coordinator SAT-07 suffers catastrophic node loss at t=2.0s; the recovery engine detects the loss, evaluates connected components, and honestly reports UNRESOLVED leadership without split-brain or fabricated elections.",
+  "configuration": {
+    "duration_sec": 10.0,
+    "time_step_sec": 0.5,
+    "time_warp": 1.0,
+    "max_isl_range_m": 5000000.0,
+    "random_seed": null
+  },
+  "initial_invariants": {
+    "min_nominal_satellites": 12,
+    "expected_coordinator": "SAT-07",
+    "expected_relays": ["SAT-04", "SAT-08", "SAT-12"]
+  },
+  "scheduled_faults": [
+    {
+      "time_sec": 2.0,
+      "satellite_id": "SAT-07",
+      "failure_type": "Node Loss",
+      "severity": "CRITICAL",
+      "description": "Catastrophic coordinator spacecraft loss under fragmented network topology"
+    }
+  ],
+  "expected_outcomes": {
+    "max_detection_delay_sec": 1.0,
+    "expected_role_reassignments": [],
+    "expected_completed_recoveries": [],
+    "unrecoverable_satellites": ["SAT-07"],
+    "allowed_unresolved_conditions": ["LEADERSHIP_UNRESOLVED"],
+    "require_no_manual_intervention": true
+  },
+  "acceptance_thresholds": {
+    "min_nominal_at_end": 11,
+    "max_failed_at_end": 1,
+    "max_degraded_at_end": 0,
+    "min_active_links_at_end": 4,
+    "expected_coordinator_at_end": "UNRESOLVED"
+  }
+}
