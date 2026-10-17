@@ -241,6 +241,39 @@ def get_events() -> List[Dict[str, Any]]:
 
 
 # ============================================================================
+# PHASE 6 SCENARIOS BENCHMARK ENDPOINTS
+# ============================================================================
+
+from backend.app.core.scenario_runner import (
+    ScenarioRunner,
+    list_available_scenarios,
+    load_scenario_from_file,
+)
+from backend.app.schemas.scenarios import ScenarioValidationError
+
+
+@app.get("/api/scenarios")
+def get_scenarios() -> List[Dict[str, Any]]:
+    """List all available Phase 6 benchmark scenarios."""
+    return list_available_scenarios()
+
+
+@app.post("/api/scenarios/run/{scenario_id}")
+def run_scenario_endpoint(scenario_id: str) -> Dict[str, Any]:
+    """Execute a scenario in an isolated orchestrator without mutating the live stream."""
+    try:
+        scen_def = load_scenario_from_file(scenario_id)
+    except ScenarioValidationError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    runner = ScenarioRunner()
+    result = runner.run(scen_def)
+    return result.to_dict()
+
+
+# ============================================================================
 # WEBSOCKET STREAMING ENDPOINT
 # ============================================================================
 
