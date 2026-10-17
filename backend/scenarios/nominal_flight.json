@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "id": "nominal_flight",
   "name": "Nominal Swarm Flight (Baseline)",
-  "description": "Validates continuous nominal constellation flight across multiple orbital step cycles without anomalies. Confirms that all 12 CubeSats remain NOMINAL, active ISLs are preserved, and leadership remains stable.",
+  "description": "Validates continuous nominal constellation flight across multiple orbital step cycles without anomalies. Confirms that all 12 CubeSats remain NOMINAL, local active ISLs are preserved, and leadership remains stable with bootstrap coordinator SAT-07 assigned at swarm initialization (runtime failover elections enforce connected-component quorum rules when leadership changes occur).",
   "configuration": {
     "duration_sec": 10.0,
     "time_step_sec": 0.5,

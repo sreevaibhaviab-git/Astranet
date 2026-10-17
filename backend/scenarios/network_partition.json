@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "id": "network_partition",
   "name": "Network Partition & Quorum-Constrained Leadership",
-  "description": "Evaluates swarm behavior under constellation network partitions where global and connected quorum is unavailable. Coordinator SAT-07 suffers catastrophic node loss at t=2.0s; the recovery engine detects the loss, evaluates connected components, and honestly reports UNRESOLVED leadership without split-brain or fabricated elections.",
+  "description": "Evaluates swarm behavior under constellation network partitions where global and connected quorum is unavailable. SAT-07 begins as the bootstrap coordinator assigned during swarm initialization. When SAT-07 suffers catastrophic node loss at t=2.0s, the recovery engine detects the loss, evaluates connected components against quorum rules, and honestly reports UNRESOLVED leadership without split-brain or fabricated elections because no partition satisfies the connected-component quorum requirement.",
   "configuration": {
     "duration_sec": 10.0,
     "time_step_sec": 0.5,
