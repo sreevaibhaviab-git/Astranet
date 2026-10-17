@@ -336,16 +336,16 @@ class ScenarioRunner:
             acceptance_checks.append(AcceptanceCheckResult(
                 name="Initial Invariant: Coordinator",
                 passed=False,
-                details=f"Expected coordinator {init_inv.expected_coordinator}, found {baseline_metrics.coordinator_id}",
+                details=f"Expected bootstrap coordinator {init_inv.expected_coordinator}, found {baseline_metrics.coordinator_id}",
                 expected=init_inv.expected_coordinator,
                 actual=baseline_metrics.coordinator_id,
             ))
-            failure_reasons.append("Initial coordinator invariant violated at t=0")
+            failure_reasons.append("Initial bootstrap coordinator invariant violated at t=0")
         else:
             acceptance_checks.append(AcceptanceCheckResult(
                 name="Initial Invariant: Coordinator",
                 passed=True,
-                details=f"Coordinator verified as {baseline_metrics.coordinator_id} at t=0",
+                details=f"Bootstrap coordinator verified as {baseline_metrics.coordinator_id} at t=0 (pre-failure swarm initialization)",
             ))
 
         # 3. Execution state tracking
@@ -546,7 +546,7 @@ class ScenarioRunner:
                 acceptance_checks.append(AcceptanceCheckResult(
                     name=f"Role Reassignment ({req_reassign.plane} {req_reassign.new_role})",
                     passed=True,
-                    details=f"Relay reassignment confirmed in {req_reassign.plane} replacing {req_reassign.replaced_satellite_id}",
+                    details=f"Relay reassignment confirmed in {req_reassign.plane} replacing {req_reassign.replaced_satellite_id} (local ISL links preserved)",
                 ))
             else:
                 acceptance_checks.append(AcceptanceCheckResult(
@@ -636,7 +636,7 @@ class ScenarioRunner:
             acceptance_checks.append(AcceptanceCheckResult(
                 name="Final Active ISL Links",
                 passed=True,
-                details=f"Final active ISL links: {final_metrics.active_links_count} >= threshold {thresh.min_active_links_at_end}",
+                details=f"Final active ISL links: {final_metrics.active_links_count} >= threshold {thresh.min_active_links_at_end} (local active ISL links)",
                 expected=thresh.min_active_links_at_end,
                 actual=final_metrics.active_links_count,
             ))

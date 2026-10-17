@@ -40,6 +40,8 @@ INITIAL_SATELLITE_CONFIGS: List[Dict[str, Any]] = [
     # Plane B
     {"id": "SAT-05", "name": "SAT-05", "planeIdx": 1, "slotIdx": 0, "role": SatelliteRole.OBSERVER, "bat": 90.0, "prop": 80.0, "cpu": 31.0, "sto": 37.0, "trust": 0.99},
     {"id": "SAT-06", "name": "SAT-06", "planeIdx": 1, "slotIdx": 1, "role": SatelliteRole.OBSERVER, "bat": 93.0, "prop": 84.0, "cpu": 27.0, "sto": 33.0, "trust": 0.99},
+    # SAT-07 is the statically designated bootstrap coordinator assigned during initial swarm initialization.
+    # Runtime failover elections only occur after coordinator failure and enforce connected-component quorum.
     {"id": "SAT-07", "name": "SAT-07", "planeIdx": 1, "slotIdx": 2, "role": SatelliteRole.COORDINATOR, "bat": 87.0, "prop": 76.0, "cpu": 52.0, "sto": 71.0, "trust": 0.99},
     {"id": "SAT-08", "name": "SAT-08", "planeIdx": 1, "slotIdx": 3, "role": SatelliteRole.RELAY, "bat": 84.0, "prop": 71.0, "cpu": 48.0, "sto": 65.0, "trust": 0.96},
     # Plane C

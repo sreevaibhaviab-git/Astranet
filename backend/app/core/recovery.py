@@ -95,6 +95,14 @@ class RecoveryEngine:
     # Connected Component Election Quorum (reachable operational nodes in component)
     CONNECTED_ELECTION_QUORUM: int = 7
 
+    # Note on Swarm Leadership Architecture:
+    # SAT-07 is the initial bootstrap coordinator assigned statically during swarm
+    # initialization (at t=0). Runtime failover elections are only triggered when the
+    # current coordinator becomes unavailable (fails, isolates, comms/compute failure).
+    # When triggered, runtime failover elections strictly enforce connected-component
+    # quorum rules (CONNECTED_ELECTION_QUORUM = 7). If no component satisfies quorum,
+    # leadership status transitions safely to UNRESOLVED without split-brain elections.
+
     # Recovery Durations in Simulation Seconds
     DURATION_COMPUTE_RESET_SEC: float = 3.0
     DURATION_COMMS_RESET_SEC: float = 4.0
@@ -115,7 +123,7 @@ class RecoveryEngine:
         self._active_tasks: Dict[str, RecoveryTask] = {}
         # Tracks anomalies that have already been handled to prevent unbounded duplicate event storms
         self._processed_anomalies: Set[Tuple[str, str, str]] = set()
-        # Track last known coordinator ID for graceful handling during leadership vacancy
+        # Track last known coordinator ID (SAT-07 is initial bootstrap coordinator)
         self._last_known_coordinator_id: Optional[str] = "SAT-07"
         self._leadership_unresolved: bool = False
         self._event_counter: int = 0
@@ -958,35 +966,36 @@ class RecoveryEngine:
         replacement.role = SatelliteRole.RELAY
         replacement.capabilities.relay = True
 
-        # Re-evaluate network graph to evaluate if useful connectivity was restored
+        # Re-evaluate network graph to assess the promoted node's existing neighbor count.
+        # Note: This measures local neighbor degree of the promoted node, not global network self-healing.
         network.update(satellites)
-        restored_neighbors = network.get_neighbor_count(replacement.id)
+        active_neighbors = network.get_neighbor_count(replacement.id)
 
-        if restored_neighbors > 0:
+        if active_neighbors > 0:
             replacement.autonomy_status = (
                 f"Promoted to RELAY in {replacement.plane} replacing {broken_relay.id} "
-                f"({restored_neighbors} active ISL links)"
+                f"(promoted to RELAY with {active_neighbors} active ISL neighbors)"
             )
             self._record_event(
                 sim_time_sec=sim_time,
                 satellite_id=replacement.id,
                 message=(
                     f"Relay reassignment: {replacement.id} promoted to RELAY in {replacement.plane} "
-                    f"replacing {broken_relay.id} (restored {restored_neighbors} active ISL links)"
+                    f"replacing {broken_relay.id} (promoted to RELAY with {active_neighbors} active ISL neighbors)"
                 ),
                 severity="nominal",
             )
         else:
             replacement.autonomy_status = (
                 f"Assigned RELAY in {replacement.plane} replacing {broken_relay.id} "
-                f"(partial handover: 0 active links)"
+                f"(partial handover: promoted to RELAY with 0 active ISL neighbors)"
             )
             self._record_event(
                 sim_time_sec=sim_time,
                 satellite_id=replacement.id,
                 message=(
                     f"Relay handover partial: {replacement.id} promoted to RELAY in {replacement.plane} "
-                    f"replacing {broken_relay.id}, but no active ISL links restored (0 neighbors)"
+                    f"replacing {broken_relay.id} (promoted to RELAY with 0 active ISL neighbors)"
                 ),
                 severity="warning",
             )
