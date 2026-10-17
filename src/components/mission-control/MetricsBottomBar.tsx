@@ -1,24 +1,38 @@
-import { SatelliteTelemetry } from "../../data/mockMissionControl";
+import { NetworkSummary, SatelliteTelemetry, SwarmSummary } from "../../data/mockMissionControl";
 
 interface MetricsBottomBarProps {
   satellites: SatelliteTelemetry[];
+  networkSummary?: NetworkSummary | null;
+  swarmSummary?: SwarmSummary | null;
 }
 
-export default function MetricsBottomBar({ satellites }: MetricsBottomBarProps) {
-  const nominalCount = satellites.filter((s) => s.state === "NOMINAL").length;
-  const degradedCount = satellites.filter(
-    (s) => s.state === "DEGRADED" || s.state === "WARNING" || s.state === "SUSPECTED"
-  ).length;
-  const failedCount = satellites.filter(
-    (s) => s.state === "FAILED" || s.state === "ISOLATED"
-  ).length;
+export default function MetricsBottomBar({
+  satellites,
+  networkSummary,
+  swarmSummary,
+}: MetricsBottomBarProps) {
+  const nominalCount = swarmSummary ? swarmSummary.nominal : satellites.filter((s) => s.state === "NOMINAL").length;
+  const degradedCount = swarmSummary
+    ? swarmSummary.degraded
+    : satellites.filter((s) => s.state === "DEGRADED" || s.state === "WARNING" || s.state === "SUSPECTED").length;
+  const failedCount = swarmSummary
+    ? swarmSummary.failed + (swarmSummary.isolated || 0)
+    : satellites.filter((s) => s.state === "FAILED" || s.state === "ISOLATED").length;
+  const totalCount = swarmSummary ? swarmSummary.total : satellites.length;
+
+  const linksCount = networkSummary ? `${networkSummary.activeLinks} Links` : "24 Links";
+  const latencyDisplay = networkSummary ? `${networkSummary.averageLatencyMs.toFixed(1)} ms Avg Latency` : "18 ms Latency";
+  const isNetworkConnected = networkSummary ? networkSummary.connected : true;
+  const partitionText = networkSummary && networkSummary.partitionCount > 1
+    ? `${networkSummary.partitionCount} Partitions`
+    : "Single Component";
 
   return (
     <div className="w-full bg-[#080D15]/95 border-t border-white/6 px-6 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-sans select-none text-[#7F8C9A]">
       {/* Block 1: Swarm */}
       <div className="flex items-center gap-3">
         <span className="text-white font-medium">Swarm</span>
-        <span>12 Total</span>
+        <span>{totalCount} Total</span>
         <span>·</span>
         <span className="text-[#10B981] font-medium">{nominalCount} Nominal</span>
         <span>·</span>
@@ -34,13 +48,15 @@ export default function MetricsBottomBar({ satellites }: MetricsBottomBarProps) 
       {/* Block 2: Network */}
       <div className="flex items-center gap-3">
         <span className="text-white font-medium">Network</span>
-        <span>24 Links</span>
+        <span>{linksCount}</span>
         <span>·</span>
-        <span>18 ms Latency</span>
+        <span>{latencyDisplay}</span>
         <span>·</span>
-        <span>0.4% Loss</span>
+        <span>{partitionText}</span>
         <span>·</span>
-        <span className="text-[#10B981] font-medium">Connected</span>
+        <span className={isNetworkConnected ? "text-[#10B981] font-medium" : "text-[#F59E0B] font-medium"}>
+          {isNetworkConnected ? "Connected" : "Partitioned"}
+        </span>
       </div>
 
       {/* Block 3: Mission */}
@@ -50,9 +66,11 @@ export default function MetricsBottomBar({ satellites }: MetricsBottomBarProps) 
         <span>·</span>
         <span>Earth Observation + Relay</span>
         <span>·</span>
-        <span className="text-[#10B981] font-medium">Nominal</span>
+        <span className="text-[#10B981] font-medium">
+          {swarmSummary?.coordinatorId ? `Coord: ${swarmSummary.coordinatorId}` : "Nominal"}
+        </span>
         <span>·</span>
-        <span>Resilience: Calculating</span>
+        <span>Resilience: Dynamic</span>
       </div>
     </div>
   );
