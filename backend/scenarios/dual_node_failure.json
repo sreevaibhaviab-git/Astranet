@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "id": "dual_node_failure",
+  "name": "Dual-Node Failure & Autonomous Self-Healing",
+  "description": "Primary Phase 6 Benchmark: Nominal flight baseline, followed by dual-node failure: critical relay transmitter loss on SAT-04 in Plane A at t=2.0s, followed by moderate compute failure on SAT-02 at t=4.0s. Demonstrates autonomous fault detection, peer observation, relay role reassignment in Plane A to an eligible healthy observer, flight software watchdog reset recovery for SAT-02, and dynamic network self-healing without manual operator intervention.",
+  "configuration": {
+    "duration_sec": 15.0,
+    "time_step_sec": 0.5,
+    "time_warp": 1.0,
+    "max_isl_range_m": 5000000.0,
+    "random_seed": null
+  },
+  "initial_invariants": {
+    "min_nominal_satellites": 12,
+    "expected_coordinator": "SAT-07",
+    "expected_relays": ["SAT-04", "SAT-08", "SAT-12"]
+  },
+  "scheduled_faults": [
+    {
+      "time_sec": 2.0,
+      "satellite_id": "SAT-04",
+      "failure_type": "Communication Failure",
+      "severity": "CRITICAL",
+      "description": "Primary relay transmitter hardware burnout in Plane A"
+    },
+    {
+      "time_sec": 4.0,
+      "satellite_id": "SAT-02",
+      "failure_type": "Compute Failure",
+      "severity": "MODERATE",
+      "description": "Onboard flight computer single-event upset in Plane A"
+    }
+  ],
+  "expected_outcomes": {
+    "max_detection_delay_sec": 1.0,
+    "expected_role_reassignments": [
+      {
+        "plane": "PLANE A",
+        "new_role": "RELAY",
+        "replaced_satellite_id": "SAT-04"
+      }
+    ],
+    "expected_completed_recoveries": [
+      {
+        "satellite_id": "SAT-02",
+        "action_type": "RESET_COMPUTE"
+      }
+    ],
+    "unrecoverable_satellites": ["SAT-04"],
+    "allowed_unresolved_conditions": [],
+    "require_no_manual_intervention": true
+  },
+  "acceptance_thresholds": {
+    "min_nominal_at_end": 11,
+    "max_failed_at_end": 1,
+    "max_degraded_at_end": 0,
+    "min_active_links_at_end": 4,
+    "expected_coordinator_at_end": "SAT-07"
+  }
+}
