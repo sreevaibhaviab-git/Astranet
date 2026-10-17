@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "id": "seeded_random_faults",
   "name": "Seeded Stochastic Fault Resilience Benchmark",
-  "description": "Injects a reproducible sequence of pseudo-random faults governed by a deterministic random seed (seed: 42). Validates that identical seeds yield identical fault sequences, state trajectories, and recovery metrics across independent runs.",
+  "description": "Injects a reproducible sequence of pseudo-random faults governed by a deterministic random seed (seed: 42). Validates that identical seeds yield identical fault sequences, state trajectories, and recovery metrics across independent runs under bootstrap coordinator SAT-07.",
   "configuration": {
     "duration_sec": 15.0,
     "time_step_sec": 0.5,

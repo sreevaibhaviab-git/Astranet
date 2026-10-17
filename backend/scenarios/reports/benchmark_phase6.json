@@ -9,7 +9,7 @@
       "status": "PASS",
       "duration_sim_sec": 16.0,
       "steps_executed": 32,
-      "wall_clock_duration_sec": 0.0267,
+      "wall_clock_duration_sec": 0.0273,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -139,12 +139,12 @@
         {
           "satelliteId": "SAT-06",
           "timestamp": 3.5,
-          "message": "Relay reassignment: SAT-06 promoted to RELAY in PLANE B replacing SAT-08 (restored 1 active ISL links)"
+          "message": "Relay reassignment: SAT-06 promoted to RELAY in PLANE B replacing SAT-08 (promoted to RELAY with 1 active ISL neighbors)"
         },
         {
           "satelliteId": "SAT-11",
           "timestamp": 7.5,
-          "message": "Relay handover partial: SAT-11 promoted to RELAY in PLANE C replacing SAT-10, but no active ISL links restored (0 neighbors)"
+          "message": "Relay handover partial: SAT-11 promoted to RELAY in PLANE C replacing SAT-10 (promoted to RELAY with 0 active ISL neighbors)"
         }
       ],
       "completed_recoveries": [
@@ -236,7 +236,7 @@
           "events": [
             "Local peer observation confirmed anomaly for SAT-08 (single-peer check; no multi-peer consensus; simulated telemetry inspection)",
             "SAT-08 communications hardware unrecoverable: transmitter disabled permanently",
-            "Relay reassignment: SAT-06 promoted to RELAY in PLANE B replacing SAT-08 (restored 1 active ISL links)"
+            "Relay reassignment: SAT-06 promoted to RELAY in PLANE B replacing SAT-08 (promoted to RELAY with 1 active ISL neighbors)"
           ]
         },
         {
@@ -315,7 +315,7 @@
           "events": [
             "Local peer observation confirmed anomaly for SAT-10 (single-peer check; no multi-peer consensus; simulated telemetry inspection)",
             "SAT-10 catastrophic node loss: permanently isolated from constellation",
-            "Relay handover partial: SAT-11 promoted to RELAY in PLANE C replacing SAT-10, but no active ISL links restored (0 neighbors)"
+            "Relay handover partial: SAT-11 promoted to RELAY in PLANE C replacing SAT-10 (promoted to RELAY with 0 active ISL neighbors)"
           ]
         },
         {
@@ -485,7 +485,7 @@
         {
           "name": "Initial Invariant: Coordinator",
           "passed": true,
-          "details": "Coordinator verified as SAT-07 at t=0",
+          "details": "Bootstrap coordinator verified as SAT-07 at t=0 (pre-failure swarm initialization)",
           "expected": null,
           "actual": null
         },
@@ -506,14 +506,14 @@
         {
           "name": "Role Reassignment (PLANE B RELAY)",
           "passed": true,
-          "details": "Relay reassignment confirmed in PLANE B replacing SAT-08",
+          "details": "Relay reassignment confirmed in PLANE B replacing SAT-08 (local ISL links preserved)",
           "expected": null,
           "actual": null
         },
         {
           "name": "Role Reassignment (PLANE C RELAY)",
           "passed": true,
-          "details": "Relay reassignment confirmed in PLANE C replacing SAT-10",
+          "details": "Relay reassignment confirmed in PLANE C replacing SAT-10 (local ISL links preserved)",
           "expected": null,
           "actual": null
         },
@@ -562,7 +562,7 @@
         {
           "name": "Final Active ISL Links",
           "passed": true,
-          "details": "Final active ISL links: 3 >= threshold 3",
+          "details": "Final active ISL links: 3 >= threshold 3 (local active ISL links)",
           "expected": 3,
           "actual": 3
         },
@@ -579,11 +579,11 @@
     },
     {
       "scenario_id": "dual_node_failure",
-      "scenario_name": "Dual-Node Failure & Autonomous Self-Healing",
+      "scenario_name": "Dual-Node Failure & Autonomous Local Recovery",
       "status": "PASS",
       "duration_sim_sec": 15.0,
       "steps_executed": 30,
-      "wall_clock_duration_sec": 0.0306,
+      "wall_clock_duration_sec": 0.0278,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -707,7 +707,7 @@
         {
           "satelliteId": "SAT-01",
           "timestamp": 2.5,
-          "message": "Relay reassignment: SAT-01 promoted to RELAY in PLANE A replacing SAT-04 (restored 1 active ISL links)"
+          "message": "Relay reassignment: SAT-01 promoted to RELAY in PLANE A replacing SAT-04 (promoted to RELAY with 1 active ISL neighbors)"
         }
       ],
       "completed_recoveries": [
@@ -776,7 +776,7 @@
           "events": [
             "Local peer observation confirmed anomaly for SAT-04 (single-peer check; no multi-peer consensus; simulated telemetry inspection)",
             "SAT-04 communications hardware unrecoverable: transmitter disabled permanently",
-            "Relay reassignment: SAT-01 promoted to RELAY in PLANE A replacing SAT-04 (restored 1 active ISL links)"
+            "Relay reassignment: SAT-01 promoted to RELAY in PLANE A replacing SAT-04 (promoted to RELAY with 1 active ISL neighbors)"
           ]
         },
         {
@@ -1021,7 +1021,7 @@
         {
           "name": "Initial Invariant: Coordinator",
           "passed": true,
-          "details": "Coordinator verified as SAT-07 at t=0",
+          "details": "Bootstrap coordinator verified as SAT-07 at t=0 (pre-failure swarm initialization)",
           "expected": null,
           "actual": null
         },
@@ -1042,7 +1042,7 @@
         {
           "name": "Role Reassignment (PLANE A RELAY)",
           "passed": true,
-          "details": "Relay reassignment confirmed in PLANE A replacing SAT-04",
+          "details": "Relay reassignment confirmed in PLANE A replacing SAT-04 (local ISL links preserved)",
           "expected": null,
           "actual": null
         },
@@ -1077,7 +1077,7 @@
         {
           "name": "Final Active ISL Links",
           "passed": true,
-          "details": "Final active ISL links: 5 >= threshold 4",
+          "details": "Final active ISL links: 5 >= threshold 4 (local active ISL links)",
           "expected": 4,
           "actual": 5
         },
@@ -1098,7 +1098,7 @@
       "status": "PASS",
       "duration_sim_sec": 10.0,
       "steps_executed": 20,
-      "wall_clock_duration_sec": 0.0187,
+      "wall_clock_duration_sec": 0.0183,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -1426,7 +1426,7 @@
         {
           "name": "Initial Invariant: Coordinator",
           "passed": true,
-          "details": "Coordinator verified as SAT-07 at t=0",
+          "details": "Bootstrap coordinator verified as SAT-07 at t=0 (pre-failure swarm initialization)",
           "expected": null,
           "actual": null
         },
@@ -1468,7 +1468,7 @@
         {
           "name": "Final Active ISL Links",
           "passed": true,
-          "details": "Final active ISL links: 5 >= threshold 4",
+          "details": "Final active ISL links: 5 >= threshold 4 (local active ISL links)",
           "expected": 4,
           "actual": 5
         },
@@ -1489,7 +1489,7 @@
       "status": "PASS",
       "duration_sim_sec": 10.0,
       "steps_executed": 20,
-      "wall_clock_duration_sec": 0.0214,
+      "wall_clock_duration_sec": 0.0213,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -1807,7 +1807,7 @@
         {
           "name": "Initial Invariant: Coordinator",
           "passed": true,
-          "details": "Coordinator verified as SAT-07 at t=0",
+          "details": "Bootstrap coordinator verified as SAT-07 at t=0 (pre-failure swarm initialization)",
           "expected": null,
           "actual": null
         },
@@ -1835,7 +1835,7 @@
         {
           "name": "Final Active ISL Links",
           "passed": true,
-          "details": "Final active ISL links: 6 >= threshold 4",
+          "details": "Final active ISL links: 6 >= threshold 4 (local active ISL links)",
           "expected": 4,
           "actual": 6
         },
@@ -1856,7 +1856,7 @@
       "status": "PASS",
       "duration_sim_sec": 15.0,
       "steps_executed": 30,
-      "wall_clock_duration_sec": 0.0283,
+      "wall_clock_duration_sec": 0.0305,
       "baseline_metrics": {
         "sim_time_sec": 0.0,
         "nominal_count": 12,
@@ -2303,7 +2303,7 @@
         {
           "name": "Initial Invariant: Coordinator",
           "passed": true,
-          "details": "Coordinator verified as SAT-07 at t=0",
+          "details": "Bootstrap coordinator verified as SAT-07 at t=0 (pre-failure swarm initialization)",
           "expected": null,
           "actual": null
         },
@@ -2338,7 +2338,7 @@
         {
           "name": "Final Active ISL Links",
           "passed": true,
-          "details": "Final active ISL links: 6 >= threshold 4",
+          "details": "Final active ISL links: 6 >= threshold 4 (local active ISL links)",
           "expected": 4,
           "actual": 6
         },
