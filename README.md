@@ -31,7 +31,7 @@ Frontend: React, TypeScript, Vite, CesiumJS, Three.js, Tailwind CSS
 
 Backend: Python, FastAPI, WebSockets, NumPy, SciPy, NetworkX, SGP4 and Basilisk where appropriate
 
-## Team — Ctrl Freaks
+## Roles
 
 - Vaibhavi — Mission Control UI, visualization and integration
 - Hari — Simulation and digital-twin backend & Autonomy, resilience and recovery engine.
@@ -44,7 +44,7 @@ Backend: Python, FastAPI, WebSockets, NumPy, SciPy, NetworkX, SGP4 and Basilisk 
 - main — stable integration
 - vaibhavi — frontend
 - hari — simulation
-- zahid — autonomy and recovery
+- hari — autonomy and recovery
 - rits — scenarios and validation
 
 ## Run Locally
